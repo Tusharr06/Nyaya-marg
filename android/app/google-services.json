@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "62948481801",
+    "project_id": "nyayamarg",
+    "storage_bucket": "nyayamarg.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:62948481801:android:135e3dd41207b7799991d8",
+        "android_client_info": {
+          "package_name": "com.example.nyaya_marg"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB6FFuVTREcTrogrKIVh1ZBR1zkFMr53WA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
