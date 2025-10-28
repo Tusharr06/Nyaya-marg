@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart'; 
-import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart'; // FIXED: Official package
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:nyaya_marg/auth_screens/service/gemini_service.dart';
@@ -18,8 +18,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   final List<ChatMessage> _messages = [
     ChatMessage(
-      text:
-          "Hello! I'm your AI Legal Assistant. How can I help you today?",
+      text: "Hello! I'm your AI Legal Assistant. How can I help you today?",
       isUser: false,
       timestamp: DateTime.now().subtract(const Duration(minutes: 2)),
     ),
@@ -45,7 +44,6 @@ class _ChatScreenState extends State<ChatScreen> {
     _controller.clear();
     _scrollToBottom();
 
-    // ---------- ENGLISH-ONLY LEGAL PROMPT ----------
     final prompt = """
 You are Nyaya Marg AI, a professional legal assistant for Indian law.
 Answer **in English only**, keep it concise (3-5 sentences), cite sections.
@@ -98,14 +96,6 @@ User query: "$text"
         backgroundColor: Colors.white,
         elevation: 2,
         shadowColor: AppColors.shadowGrey.withOpacity(0.15),
-        // leading: IconButton(
-        //   icon: const Icon(Icons.arrow_back, color: Colors.black),
-        //   onPressed: () { 
-        //       Navigator.of(context).pushReplacement(
-        //       MaterialPageRoute(builder: (_) => const HomeScreen()), 
-        //     );
-        //   },
-        // ),
         title: Row(
           children: [
             CircleAvatar(
@@ -136,6 +126,7 @@ User query: "$text"
             ),
           ],
         ),
+        centerTitle: false, // LEFT ALIGNED
       ),
       backgroundColor: AppColors.backgroundColor,
       body: Column(
@@ -153,7 +144,7 @@ User query: "$text"
               },
             ),
           ),
-          // ───── INPUT BAR ─────
+          // INPUT BAR
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
@@ -209,7 +200,7 @@ User query: "$text"
     );
   }
 
-  // ───── BUBBLE (uses Markdown for bold) ─────
+  // MESSAGE BUBBLE
   Widget _messageBubble(ChatMessage msg) {
     final bool isUser = msg.isUser;
     final Color bubble = isUser
@@ -256,13 +247,17 @@ User query: "$text"
                   )
                 : MarkdownBody(
                     data: msg.text,
+                    selectable: true,
                     styleSheet: MarkdownStyleSheet(
                       p: GoogleFonts.poppins(
                         color: Colors.black87,
                         fontSize: 15,
                         height: 1.4,
                       ),
-                      strong: const TextStyle(fontWeight: FontWeight.bold),
+                      strong: GoogleFonts.poppins(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
                     ),
                   ),
           ),
@@ -279,16 +274,16 @@ User query: "$text"
     );
   }
 
-  // ───── TYPING INDICATOR (unchanged) ─────
+  // TYPING INDICATOR
   Widget _typingIndicator() {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
         children: [
-          const CircleAvatar(
+          CircleAvatar(
             radius: 16,
             backgroundColor: AppColors.goldenAccent,
-            child: Icon(Icons.smart_toy, color: Colors.white, size: 16),
+            child: const Icon(Icons.smart_toy, color: Colors.white, size: 16),
           ),
           const SizedBox(width: 12),
           Container(
@@ -322,7 +317,7 @@ User query: "$text"
   }
 }
 
-// ───── MODEL ─────
+// MODEL
 class ChatMessage {
   final String text;
   final bool isUser;
