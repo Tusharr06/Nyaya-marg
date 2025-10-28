@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:nyaya_marg/auth_screens/auth_router.dart';
-import 'package:nyaya_marg/screens/client_screen/main_home_screen.dart';
 import 'package:nyaya_marg/theme/colors.dart'; 
 import 'login_screen.dart'; 
 
 class SignupScreen extends StatefulWidget {
-  const SignupScreen({super.key});
+  final String? selectedRole;
+  const SignupScreen({super.key, this.selectedRole});
 
   @override
   _SignupScreenState createState() => _SignupScreenState();
@@ -39,10 +40,24 @@ void initState() {
 
       setState(() => _isLoading = true);
       try {
-        await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
+
+        // Save user role to Firestore
+        if (userCredential.user != null && widget.selectedRole != null) {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(userCredential.user!.uid)
+              .set({
+            'uid': userCredential.user!.uid,
+            'email': userCredential.user!.email,
+            'name': userCredential.user!.displayName ?? '',
+            'role': widget.selectedRole,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        }
 
         if (mounted) {
           final home = await getHomeAfterAuth();
@@ -104,7 +119,7 @@ void initState() {
                               onPressed: () {
                                 Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (context) => const LoginScreen()),
+                                  MaterialPageRoute(builder: (context) => LoginScreen(selectedRole: widget.selectedRole)),
                                 );
                               },
                               child: Text(

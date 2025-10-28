@@ -1,6 +1,4 @@
 // lib/auth_screens/role_selection_screen.dart
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:nyaya_marg/auth_screens/login_screen.dart';
@@ -20,19 +18,10 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        // Save role immediately
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .set({'role': role}, SetOptions(merge: true));
-      }
-
-      // Go to LoginScreen (role is saved)
+      // Go to LoginScreen with selected role
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          MaterialPageRoute(builder: (_) => LoginScreen(selectedRole: role)),
         );
       }
     } catch (e) {

@@ -16,7 +16,7 @@
       isInitialize = true;
     }
     // Sign in with Google
-    static Future<UserCredential?> signInWithGoogle() async {
+    static Future<UserCredential?> signInWithGoogle({String? role}) async {
       try {
         initSignIn();
         final GoogleSignInAccount googleUser = await _googleSignIn.authenticate();
@@ -53,6 +53,7 @@
               'email': user.email ?? '',
               'photoURL': user.photoURL ?? '',
               'provider': 'google',
+              'role': role,
               'createdAt': FieldValue.serverTimestamp(),
             });
           }

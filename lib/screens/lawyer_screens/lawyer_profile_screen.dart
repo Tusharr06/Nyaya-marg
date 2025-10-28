@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:nyaya_marg/auth_screens/login_screen.dart';
-import 'package:nyaya_marg/auth_screens/role_selection_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:nyaya_marg/auth_screens/service/logout_service.dart';
 import 'package:nyaya_marg/theme/colors.dart';
 
 class LawyerProfileScreen extends StatelessWidget {
@@ -9,6 +10,7 @@ class LawyerProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppColors.primaryBlue,
@@ -21,80 +23,100 @@ class LawyerProfileScreen extends StatelessWidget {
         ),
         centerTitle: true,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            const CircleAvatar(
-              radius: 50,
-              backgroundImage: AssetImage('assets/images/lawyer_avatar.png'),
-            ),
-            const SizedBox(height: 15),
-            Text(
-              'Adv. Rohan Mehta',
-              style: GoogleFonts.poppins(
-                fontSize: 22,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            Text(
-              'Criminal & Civil Law Specialist',
-              style: GoogleFonts.poppins(color: Colors.grey[700]),
-            ),
-            const SizedBox(height: 25),
-
-            // Info Tiles
-            _buildInfoTile(Icons.badge_outlined, 'Bar Council ID', 'DL-2025-1458'),
-            _buildInfoTile(Icons.email_outlined, 'Email', 'rohan.mehta@lawmail.com'),
-            _buildInfoTile(Icons.phone_outlined, 'Phone', '+91 98765 43210'),
-            _buildInfoTile(Icons.language_outlined, 'Languages', 'English, Hindi'),
-
-            const Spacer(),
-
-            // Edit Profile Button
-            ElevatedButton.icon(
-              onPressed: () {},
-              icon: const Icon(Icons.edit_outlined),
-              label: const Text('Edit Profile'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryBlue,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: user != null 
+            ? FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots()
+            : null,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          
+          final userData = snapshot.data?.data() as Map<String, dynamic>?;
+          final displayName = user?.displayName ?? userData?['name'] ?? 'Advocate';
+          final email = user?.email ?? 'No email';
+          final phone = userData?['phone'] ?? 'Not provided';
+          final barCouncilId = userData?['barCouncilId'] ?? 'Not provided';
+          final specialization = userData?['specialization'] ?? 'Law Specialist';
+          final languages = userData?['languages'] ?? 'English';
+          
+          return Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                CircleAvatar(
+                  radius: 50,
+                  backgroundColor: AppColors.primaryBlue,
+                  child: Text(
+                    displayName.isNotEmpty ? displayName[0].toUpperCase() : 'A',
+                    style: GoogleFonts.poppins(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              ),
-            ),
-            const SizedBox(height: 10),
+                const SizedBox(height: 15),
+                Text(
+                  displayName,
+                  style: GoogleFonts.poppins(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  specialization,
+                  style: GoogleFonts.poppins(color: Colors.grey[700]),
+                ),
+                const SizedBox(height: 25),
 
-            // Logout Button
-            OutlinedButton.icon(
-              onPressed: () { 
-                 Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const RoleSelectionScreen()),
+                // Info Tiles
+                _buildInfoTile(Icons.badge_outlined, 'Bar Council ID', barCouncilId),
+                _buildInfoTile(Icons.email_outlined, 'Email', email),
+                _buildInfoTile(Icons.phone_outlined, 'Phone', phone),
+                _buildInfoTile(Icons.language_outlined, 'Languages', languages),
+
+                const Spacer(),
+
+                // Edit Profile Button
+                ElevatedButton.icon(
+                  onPressed: () {},
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('Edit Profile'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryBlue,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // Logout Button
+                OutlinedButton.icon(
+                  onPressed: () => LogoutService.logout(context),
+                  icon: const Icon(Icons.logout, color: Colors.redAccent),
+                  label: Text(
+                    'Logout',
+                    style: GoogleFonts.poppins(
+                      color: Colors.redAccent,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.redAccent),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  ),
+                ),
+              ],
+            ),
           );
-              },
-              icon: const Icon(Icons.logout, color: Colors.redAccent),
-              label: Text(
-                'Logout',
-                style: GoogleFonts.poppins(
-                  color: Colors.redAccent,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Colors.redAccent),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              ),
-            ),
-          ],
-        ),
+        },
       ),
     );
   }

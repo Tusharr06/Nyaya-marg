@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:nyaya_marg/auth_screens/auth_router.dart';
 import 'package:nyaya_marg/auth_screens/service/auth_method.dart';
 import 'package:nyaya_marg/auth_screens/singup_screen.dart';
-import 'package:nyaya_marg/screens/client_screen/main_home_screen.dart';
 import 'package:nyaya_marg/theme/colors.dart'; 
 
 // Notifier used to enable/disable chat across screens; default to true.
 ValueNotifier<bool> chatEnabledNotifier = ValueNotifier<bool>(true);
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  final String? selectedRole;
+  const LoginScreen({super.key, this.selectedRole});
 
   @override
   _LoginScreenState createState() => _LoginScreenState();
@@ -34,58 +35,163 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _login() async {
-  if (_formKey.currentState!.validate()) {
-    setState(() => _isLoading = true);
-    try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
+    if (_formKey.currentState!.validate()) {
+      setState(() => _isLoading = true);
+      try {
+        await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
+        );
 
-      if (mounted) {
-        final home = await getHomeAfterAuth(); // This will return RoleSelectionScreen if no role
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => home));
+        if (mounted) {
+          // Validate role after successful authentication
+          final isValidRole = await _validateUserRole();
+          if (isValidRole) {
+            final home = await getHomeAfterAuth();
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => home));
+          } else {
+            // Check if user exists but doesn't have a role yet
+            final user = FirebaseAuth.instance.currentUser;
+            if (user != null && widget.selectedRole != null) {
+              final doc = await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(user.uid)
+                  .get();
+              
+              if (!doc.exists || doc.data()?['role'] == null) {
+                // User exists but no role - save the selected role
+                await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(user.uid)
+                    .set({
+                  'uid': user.uid,
+                  'email': user.email,
+                  'name': user.displayName ?? '',
+                  'role': widget.selectedRole,
+                  'createdAt': FieldValue.serverTimestamp(),
+                }, SetOptions(merge: true));
+                
+                // Now proceed to home screen
+                final home = await getHomeAfterAuth();
+                Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => home));
+                return;
+              }
+            }
+            
+            // Sign out user if role doesn't match
+            await FirebaseAuth.instance.signOut();
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('No account found with ${widget.selectedRole} role'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          }
+        }
+      } on FirebaseAuthException catch (e) {
+        String message;
+        switch (e.code) {
+          case 'user-not-found':
+            message = 'No user found with that email.';
+            break;
+          case 'wrong-password':
+            message = 'Incorrect password.';
+            break;
+          case 'invalid-email':
+            message = 'Invalid email format.';
+            break;
+          default:
+            message = 'Error: ${e.message}';
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+        }
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
       }
-    } on FirebaseAuthException catch (e) {
-      String message;
-      switch (e.code) {
-        case 'user-not-found':
-          message = 'No user found with that email.';
-          break;
-        case 'wrong-password':
-          message = 'Incorrect password.';
-          break;
-        case 'invalid-email':
-          message = 'Invalid email format.';
-          break;
-        default:
-          message = 'Error: ${e.message}';
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() => _isGoogleLoading = true);
+    try {
+      final userCredential = await GoogleSignInService.signInWithGoogle(role: widget.selectedRole);
+      if (userCredential != null && mounted) {
+        // Validate role after successful authentication
+        final isValidRole = await _validateUserRole();
+        if (isValidRole) {
+          final home = await getHomeAfterAuth();
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => home));
+        } else {
+          // Check if user exists but doesn't have a role yet
+          final user = FirebaseAuth.instance.currentUser;
+          if (user != null && widget.selectedRole != null) {
+            final doc = await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .get();
+            
+            if (!doc.exists || doc.data()?['role'] == null) {
+              // User exists but no role - save the selected role
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(user.uid)
+                  .set({
+                'uid': user.uid,
+                'email': user.email,
+                'name': user.displayName ?? '',
+                'role': widget.selectedRole,
+                'createdAt': FieldValue.serverTimestamp(),
+              }, SetOptions(merge: true));
+              
+              // Now proceed to home screen
+              final home = await getHomeAfterAuth();
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => home));
+              return;
+            }
+          }
+          
+          // Sign out user if role doesn't match
+          await FirebaseAuth.instance.signOut();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('No account found with ${widget.selectedRole} role'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
       }
+    } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Google Sign-In failed: $e')));
       }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _isGoogleLoading = false);
     }
   }
-}
 
-Future<void> _signInWithGoogle() async {
-  setState(() => _isGoogleLoading = true);
-  try {
-    final userCredential = await GoogleSignInService.signInWithGoogle();
-    if (userCredential != null && mounted) {
-      final home = await getHomeAfterAuth(); // Same logic: checks role
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => home));
+  Future<bool> _validateUserRole() async {
+    if (widget.selectedRole == null) return true; // No role selected, allow login
+    
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
+    
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      
+      final userRole = doc.data()?['role'] as String?;
+      return userRole == widget.selectedRole;
+    } catch (e) {
+      return false;
     }
-  } catch (e) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Google Sign-In failed: $e')));
-    }
-  } finally {
-    if (mounted) setState(() => _isGoogleLoading = false);
   }
-}
 
 @override
   void dispose() {
@@ -137,7 +243,7 @@ Future<void> _signInWithGoogle() async {
                               onPressed: () {
                                 Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (context) => const SignupScreen()),
+                                  MaterialPageRoute(builder: (context) => SignupScreen(selectedRole: widget.selectedRole)),
                                 );
                               },
                               child: Text(
@@ -257,11 +363,11 @@ Future<void> _signInWithGoogle() async {
                               onPressed: () {
                                 Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (context) => const SignupScreen()),
+                                  MaterialPageRoute(builder: (context) => SignupScreen(selectedRole: widget.selectedRole)),
                                 );
                               },
                               child: Text(
-                                'Don’t have an account? Sign Up',
+                                "Don't have an account? Sign Up",
                                 style: GoogleFonts.poppins(
                                   fontSize: screenWidth * 0.04,
                                   color: AppColors.deepBlue,
