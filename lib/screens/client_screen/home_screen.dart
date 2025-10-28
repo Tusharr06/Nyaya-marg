@@ -295,206 +295,210 @@ Be concise, realistic, and base numbers on typical Indian court data.
 
   // ── RESULT UI ───────────────────────────────────────────────────────────
   Widget _buildResult() {
-    final a = _analysis;
+  final a = _analysis;
 
-    final court = a['court'] as Map<String, dynamic>? ?? {};
-    final prediction = a['prediction'] as Map<String, dynamic>? ?? {};
-    final timeline = a['timeline'] as Map<String, dynamic>? ?? {};
+  final court = a['court'] as Map<String, dynamic>? ?? {};
+  final prediction = a['prediction'] as Map<String, dynamic>? ?? {};
+  final timeline = a['timeline'] as Map<String, dynamic>? ?? {};
 
-    final courtName = _safeString(court['name']);
-    final state = _safeString(court['state']);
-    final riskScore = court['risk_score'] ?? 0.0;
-    final pendingCases = court['pending_cases'] ?? 0;
+  final courtName = _safeString(court['name']);
+  final state = _safeString(court['state']);
+  final riskScore = court['risk_score'] ?? 0.0;
+  final pendingCases = court['pending_cases'] ?? 0;
 
-    // NEW: success_probability (0-1) → 0-100%
-    final successProb = (prediction['success_probability'] ?? 0.0) * 100;
-    final confidence = (prediction['confidence'] ?? 0.0) * 100;
-    final timelineDays = timeline['expected_days'] ?? 0;
+  final successProb = (prediction['success_probability'] ?? 0.0) * 100;
+  final confidence = (prediction['confidence'] ?? 0.0) * 100;
+  final timelineDays = timeline['expected_days'] ?? 0;
 
-    String riskLevel =
-        riskScore < 0.3 ? 'Low Risk' : riskScore < 0.6 ? 'Medium Risk' : 'High Risk';
-    final overallAssessment = successProb >= 60 ? 'GOOD' : 'BAD';
+  // ── OVERALL ASSESSMENT (all 4 must be good) ───────────────────────────
+  final isHighSuccess = successProb >= 60;
+  final isLowRisk = riskScore < 0.4;
+  final isLowBacklog = pendingCases < 5000;
+  final isHighConfidence = confidence >= 76;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text('Hello ',
-                  style: GoogleFonts.poppins(
-                      fontSize: 24, color: Colors.black87)),
-              Text('$_userName!',
-                  style: GoogleFonts.poppins(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.deepBlue)),
-              const Spacer(),
-              CircleAvatar(
-                  radius: 24,
-                  backgroundColor: AppColors.deepBlue.withOpacity(0.2),
-                  child: const Icon(Icons.balance,
-                      color: AppColors.deepBlue)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text("Here's your case overview for today.",
-              style: GoogleFonts.poppins(fontSize: 15, color: Colors.black54)),
-          const SizedBox(height: 24),
+  final overallAssessment = (isHighSuccess && isLowRisk && isLowBacklog && isHighConfidence) ? 'GOOD' : 'BAD';
 
-          // ── SUMMARY ─────────────────────────────────────────────────────
-          Card(
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            elevation: 3,
-            color: Colors.white,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('CASE OUTLOOK SUMMARY',
-                      style: GoogleFonts.poppins(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87)),
-                  const SizedBox(height: 12),
-                  _summaryRow(
-                      icon: Icons.circle,
-                      color: overallAssessment == 'GOOD'
-                          ? Colors.orange
-                          : Colors.red,
-                      label: 'Overall Assessment:',
-                      value: overallAssessment,
-                      badge: true),
-                  _summaryRow(
-                      icon: Icons.location_city,
-                      label: 'Court',
-                      value: courtName),
-                  _summaryRow(
-                      icon: Icons.folder_open,
-                      label: 'Case Type',
-                      value: _selectedCaseType ?? 'N/A'),
-                  _summaryRow(
-                      icon: Icons.flag,
-                      label: 'Priority',
-                      value: _priority.isEmpty ? 'N/A' : _priority),
-                ],
-              ),
+  String riskLevel = riskScore < 0.3 ? 'Low Risk' : riskScore < 0.6 ? 'Medium Risk' : 'High Risk';
+
+  return SingleChildScrollView(
+    padding: const EdgeInsets.all(16),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text('Hello ',
+                style: GoogleFonts.poppins(
+                    fontSize: 24, color: Colors.black87)),
+            Text('$_userName!',
+                style: GoogleFonts.poppins(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.deepBlue)),
+            const Spacer(),
+            CircleAvatar(
+                radius: 24,
+                backgroundColor: AppColors.deepBlue.withOpacity(0.2),
+                child: const Icon(Icons.balance,
+                    color: AppColors.deepBlue)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text("Here's your case overview for today.",
+            style: GoogleFonts.poppins(fontSize: 15, color: Colors.black54)),
+        const SizedBox(height: 24),
+
+        // ── SUMMARY ─────────────────────────────────────────────────────
+        Card(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          elevation: 3,
+          color: Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('CASE OUTLOOK SUMMARY',
+                    style: GoogleFonts.poppins(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87)),
+                const SizedBox(height: 12),
+                _summaryRow(
+                    icon: Icons.circle,
+                    color: overallAssessment == 'GOOD'
+                        ? Colors.orange
+                        : Colors.red,
+                    label: 'Overall Assessment:',
+                    value: overallAssessment,
+                    badge: true),
+                _summaryRow(
+                    icon: Icons.location_city,
+                    label: 'Court',
+                    value: courtName),
+                _summaryRow(
+                    icon: Icons.folder_open,
+                    label: 'Case Type',
+                    value: _selectedCaseType ?? 'N/A'),
+                _summaryRow(
+                    icon: Icons.flag,
+                    label: 'Priority',
+                    value: _priority.isEmpty ? 'N/A' : _priority),
+              ],
             ),
           ),
+        ),
 
-          const SizedBox(height: 20),
-          Text('KEY METRICS',
-              style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.deepBlue)),
-          const SizedBox(height: 12),
+        const SizedBox(height: 20),
+        Text('KEY METRICS',
+            style: GoogleFonts.poppins(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppColors.deepBlue)),
+        const SizedBox(height: 12),
 
-          // ── METRICS GRID ───────────────────────────────────────────────
-          GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 2,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 1.8,
-            children: [
-              _metricCard(
-                  icon: Icons.check_circle,
-                  color: Colors.green,
-                  title: 'Court Risk Level',
-                  value: riskLevel),
-              // NEW METRIC
-              _metricCard(
-                  icon: Icons.trending_up,
-                  color: Colors.blue,
-                  title: 'Success Probability',
-                  value: '${successProb.toStringAsFixed(0)}%'),
-              _metricCard(
-                  icon: Icons.bar_chart,
-                  color: Colors.orange,
-                  title: 'Confidence',
-                  value: '${confidence.toStringAsFixed(0)}%'),
-              _metricCard(
-                  icon: Icons.access_time,
-                  color: AppColors.deepBlue,
-                  title: 'Expected Timeline',
-                  value: '~$timelineDays days'),
-            ],
-          ),
+        // ── METRICS GRID (SAME AS LAWYER SCREEN) ───────────────────────
+        GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 1.8,
+          children: [
+            _metricCard(
+                icon: Icons.shield,
+                color: Colors.green,
+                title: 'Court Risk Level',
+                value: riskLevel),
+            _metricCard(
+                icon: Icons.cases,
+                color: Colors.blue,
+                title: 'Pending Cases',
+                value: '$pendingCases'),
+            _metricCard(
+                icon: Icons.access_time,
+                color: AppColors.deepBlue,
+                title: 'Expected Timeline',
+                value: '~$timelineDays days'),
+            _metricCard(
+                icon: Icons.bar_chart,
+                color: Colors.orange,
+                title: 'Confidence',
+                value: '${confidence.toStringAsFixed(0)}%'),
+          ],
+        ),
 
-          const SizedBox(height: 20),
-          Card(
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            elevation: 2,
-            color: Colors.white,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Icon(
-                      successProb >= 60 ? Icons.check_circle : Icons.warning,
-                      color: successProb >= 60 ? Colors.green : Colors.orange,
-                      size: 28),
-                  const SizedBox(width: 12),
-                  Expanded(
-                      child: Text('Court: $courtName, State: $state',
-                          style: GoogleFonts.poppins(fontSize: 14))),
-                ],
-              ),
+        const SizedBox(height: 20),
+        Card(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          elevation: 2,
+          color: Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Icon(
+                    overallAssessment == 'GOOD' ? Icons.check_circle : Icons.warning,
+                    color: overallAssessment == 'GOOD' ? Colors.green : Colors.orange,
+                    size: 28),
+                const SizedBox(width: 12),
+                Expanded(
+                    child: Text('Court: $courtName, State: $state',
+                        style: GoogleFonts.poppins(fontSize: 14))),
+              ],
             ),
           ),
+        ),
 
-          const SizedBox(height: 20),
-          Text('Next Steps',
-              style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.deepBlue)),
-          const SizedBox(height: 12),
-          Card(
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            elevation: 2,
-            color: Colors.white,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _stepRow(Icons.search,
-                      'Monitor case status via eCourts portal'),
-                  const SizedBox(height: 12),
-                  _stepRow(Icons.description,
-                      'Prepare documentation per court guidelines'),
-                ],
-              ),
+        const SizedBox(height: 20),
+        Text('Next Steps',
+            style: GoogleFonts.poppins(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppColors.deepBlue)),
+        const SizedBox(height: 12),
+        Card(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          elevation: 2,
+          color: Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _stepRow(Icons.search,
+                    'Monitor case status via eCourts portal'),
+                const SizedBox(height: 12),
+                _stepRow(Icons.description,
+                    'Prepare documentation per court guidelines'),
+              ],
             ),
           ),
+        ),
 
-          const SizedBox(height: 24),
-          Center(
-            child: OutlinedButton.icon(
-              onPressed: _resetForm,
-              icon: const Icon(Icons.refresh),
-              label: const Text('New Analysis'),
-              style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.deepBlue,
-                  side: const BorderSide(color: AppColors.deepBlue),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(25))),
-            ),
+        const SizedBox(height: 24),
+        Center(
+          child: OutlinedButton.icon(
+            onPressed: _resetForm,
+            icon: const Icon(Icons.refresh),
+            label: const Text('New Analysis'),
+            style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.deepBlue,
+                side: const BorderSide(color: AppColors.deepBlue),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(25))),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
 
   // ── REUSABLE WIDGETS ───────────────────────────────────────────────────
   Widget _buildDropdown({
