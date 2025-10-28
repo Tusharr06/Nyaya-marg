@@ -22,9 +22,9 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
 
   static const List<Widget> _screens = <Widget>[
     HomeScreen(),
+    ToolsScreen(),
     ChatScreen(),
     KnowYourRightsHub(),
-    ToolsScreen(),
     ProfileScreen(),
   ];
 
@@ -50,16 +50,16 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
             label: 'Home',
           ),
           BottomNavigationBarItem(
+            icon: Icon(Icons.build_outlined),
+            label: 'Tools',
+          ),
+          BottomNavigationBarItem(
             icon: Icon(Icons.chat_bubble_outline),
             label: 'Chat',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.menu_book_outlined),
             label: 'Rights',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.build_outlined),
-            label: 'Tools',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),
