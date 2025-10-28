@@ -5,7 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
+import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:nyaya_marg/theme/colors.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -16,13 +16,13 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // Form
+  // ── FORM ───────────────────────────────────────────────────────────────
   String? _selectedCity;
   String? _selectedCaseType;
   String _priority = '';
   final _priorityController = TextEditingController();
 
-  // UI
+  // ── UI ─────────────────────────────────────────────────────────────────
   String _userName = 'User';
   bool _isLoadingUser = true;
   bool _isAnalyzing = false;
@@ -30,10 +30,12 @@ class _HomeScreenState extends State<HomeScreen> {
   Map<String, dynamic> _analysis = {};
   String? _error;
 
-  // API
-  final String _apiUrl =
-      'https://unsectionalised-clingiest-dorris.ngrok-free.dev/analyze';
+  // ── GEMINI ─────────────────────────────────────────────────────────────
+  final String _geminiApiKey =
+      'AIzaSyAUOLlfY3S9sQzaIEijYqJscZq6tzv9rnI'; // <-- replace / secure
+  GenerativeModel? _model;
 
+  // ── DROPDOWNS ──────────────────────────────────────────────────────────
   final List<String> _cities = [
     'Ahmedabad', 'Bangalore', 'Chandigarh', 'Chennai', 'Delhi',
     'Hyderabad', 'Jaipur', 'Kochi', 'Kolkata', 'Lucknow', 'Pune'
@@ -47,8 +49,22 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadUserName();
+    _initGemini();
   }
 
+  // ── GEMINI INITIALISATION ───────────────────────────────────────────────
+  Future<void> _initGemini() async {
+    if (_geminiApiKey.startsWith('YOUR_') || _geminiApiKey.isEmpty) {
+      setState(() => _error = 'Gemini API key not set!');
+      return;
+    }
+    _model = GenerativeModel(
+      model: 'gemini-2.5-flash', // or gemini-2.5-flash if available
+      apiKey: _geminiApiKey,
+    );
+  }
+
+  // ── USER NAME ───────────────────────────────────────────────────────────
   Future<void> _loadUserName() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
@@ -66,11 +82,13 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // ── SAFE STRING (Handles Map/List/Null) ──
+  // ── SAFE STRING ─────────────────────────────────────────────────────────
   String _safeString(dynamic value) {
     if (value == null) return 'N/A';
     if (value is String) return value;
-    if (value is num) return value.toStringAsFixed(2).replaceAllMapped(RegExp(r'0+$'), (m) => '').replaceAllMapped(RegExp(r'\.$'), (m) => '');
+    if (value is num) {
+      return value.toStringAsFixed(2).replaceAll(RegExp(r'0+$'), '').replaceAll(RegExp(r'\.$'), '');
+    }
     try {
       return jsonEncode(value);
     } catch (_) {
@@ -78,89 +96,83 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // ── ANALYZE WITH GEMINI ─────────────────────────────────────────────────
   Future<void> _analyzeCase() async {
-  if (_selectedCity == null || _selectedCaseType == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Please select City and Case Type')),
-    );
-    return;
+    if (_selectedCity == null || _selectedCaseType == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select City and Case Type')),
+      );
+      return;
+    }
+
+    if (_model == null) {
+      setState(() => _error = 'Gemini model not initialized.');
+      return;
+    }
+
+    setState(() {
+      _isAnalyzing = true;
+      _error = null;
+    });
+
+    try {
+      final prompt = '''
+You are a legal AI assistant for Indian courts.  
+Analyze the case with the following inputs:
+
+- City: $_selectedCity
+- Case Type: $_selectedCaseType
+- Priority: ${_priority.trim().isEmpty ? 'Not specified' : _priority.trim()}
+
+Return **exactly** this JSON structure (no extra text):
+
+{
+  "court": {
+    "name": "string",
+    "state": "string",
+    "risk_score": 0.0-1.0,
+    "pending_cases": integer
+  },
+  "prediction": {
+    "success_probability": 0.0-1.0,
+    "confidence": 0.0-1.0
+  },
+  "timeline": {
+    "expected_days": integer
   }
+}
+Be concise, realistic, and base numbers on typical Indian court data.
+''';
 
-  setState(() {
-    _isAnalyzing = true;
-    _error = null;
-  });
+      final content = [Content.text(prompt)];
+      final response = await _model!.generateContent(content);
 
-  try {
-    // ----- SEND JSON IN BODY (city, not state) -----
-    final Map<String, dynamic> requestBody = {
-      'city': _selectedCity!,          // <-- changed from 'state'
-      'case_type': _selectedCaseType!,
-      if (_priority.trim().isNotEmpty) 'priority': _priority.trim(),
-    };
+      final text = response.text ?? '';
+      final jsonMatch = RegExp(r'\{.*\}', dotAll: true).firstMatch(text);
 
-    print('POST → $_apiUrl');
-    print('Body → ${jsonEncode(requestBody)}');
+      if (jsonMatch == null) throw Exception('No JSON in Gemini response');
 
-    final response = await http.post(
-      Uri.parse(_apiUrl),
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: jsonEncode(requestBody),
-    ).timeout(const Duration(seconds: 30));
+      final data = jsonDecode(jsonMatch.group(0)!) as Map<String, dynamic>;
 
-    print('Status: ${response.statusCode}');
-    print('Response: ${response.body}');
-
-    // ----- SUCCESS -----
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
       setState(() {
         _analysis = data;
         _showResult = true;
         _isAnalyzing = false;
       });
-      return;
-    }
-
-    // ----- 422 VALIDATION ERRORS -----
-    if (response.statusCode == 422) {
-      final errorData = jsonDecode(response.body);
-      final List<dynamic> details = errorData['detail'] ?? [];
-
-      final errorLines = details.map((e) {
-        final loc = (e['loc'] as List).join(' → ');
-        final msg = e['msg'] as String;
-        return '$loc: $msg';
-      }).toList();
-
+    } on SocketException {
       setState(() {
-        _error = 'Validation Error:\n${errorLines.join('\n')}';
+        _error = 'No internet connection.';
         _isAnalyzing = false;
       });
-      return;
+    } catch (e) {
+      setState(() {
+        _error = 'Gemini Error: $e';
+        _isAnalyzing = false;
+      });
     }
-
-    // ----- OTHER ERRORS -----
-    setState(() {
-      _error = 'Server error: ${response.statusCode}\n${response.body}';
-      _isAnalyzing = false;
-    });
-  } on SocketException {
-    setState(() {
-      _error = 'No internet connection.';
-      _isAnalyzing = false;
-    });
-  } catch (e) {
-    setState(() {
-      _error = 'Request failed: $e';
-      _isAnalyzing = false;
-    });
   }
-}
 
+  // ── RESET ───────────────────────────────────────────────────────────────
   void _resetForm() {
     setState(() {
       _selectedCity = null;
@@ -172,6 +184,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  // ── BUILD ───────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     if (_isLoadingUser) {
@@ -189,42 +202,88 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ───── FORM UI ─────
+  // ── FORM UI ────────────────────────────────────────────────────────────
   Widget _buildForm() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Hello $_userName!', style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.deepBlue)),
+          Text('Hello $_userName!',
+              style: GoogleFonts.poppins(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.deepBlue)),
           const SizedBox(height: 8),
-          Text('Let’s analyze your case with AI-powered insights.', style: GoogleFonts.poppins(fontSize: 15, color: Colors.black87)),
+          Text('Let’s analyze your case with AI-powered insights.',
+              style: GoogleFonts.poppins(fontSize: 15, color: Colors.black87)),
           const SizedBox(height: 24),
-          _buildDropdown(label: 'Enter your City/State', hint: 'Select city', items: _cities, value: _selectedCity, onChanged: (v) => setState(() => _selectedCity = v)),
-          _buildDropdown(label: 'Enter Case Type', hint: 'Select case type', items: _caseTypes, value: _selectedCaseType, onChanged: (v) => setState(() => _selectedCaseType = v)),
-          _buildInputField(label: 'Enter Priority (optional)', controller: _priorityController, hint: 'e.g., Low, Medium, High', onChanged: (v) => _priority = v),
+
+          _buildDropdown(
+              label: 'Enter your City/State',
+              hint: 'Select city',
+              items: _cities,
+              value: _selectedCity,
+              onChanged: (v) => setState(() => _selectedCity = v)),
+          _buildDropdown(
+              label: 'Enter Case Type',
+              hint: 'Select case type',
+              items: _caseTypes,
+              value: _selectedCaseType,
+              onChanged: (v) => setState(() => _selectedCaseType = v)),
+          _buildInputField(
+              label: 'Enter Priority (optional)',
+              controller: _priorityController,
+              hint: 'e.g., Low, Medium, High',
+              onChanged: (v) => _priority = v),
+
           const SizedBox(height: 32),
+
+          // ── NEW BUTTON STYLE (same as lawyer screen) ─────────────────────
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: _isAnalyzing ? null : _analyzeCase,
               icon: _isAnalyzing
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
                   : const Icon(Icons.analytics),
               label: Text(_isAnalyzing ? 'ANALYZING...' : 'ANALYZE CASE'),
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.deepBlue, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)), elevation: 3),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: AppColors.deepBlue,
+                elevation: 3,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(25),
+                  side:
+                      const BorderSide(color: AppColors.deepBlue, width: 1.5),
+                ),
+              ),
             ),
           ),
+
           if (_error != null) ...[
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.red.withOpacity(0.3))),
+              decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border:
+                      Border.all(color: Colors.red.withOpacity(0.3))),
               child: Row(
                 children: [
-                  const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                  const Icon(Icons.error_outline,
+                      color: Colors.red, size: 20),
                   const SizedBox(width: 8),
-                  Expanded(child: Text(_error!, style: GoogleFonts.poppins(color: Colors.red, fontSize: 14))),
+                  Expanded(
+                      child: Text(_error!,
+                          style: GoogleFonts.poppins(
+                              color: Colors.red, fontSize: 14))),
                 ],
               ),
             ),
@@ -234,11 +293,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ───── RESULT UI ─────
+  // ── RESULT UI ───────────────────────────────────────────────────────────
   Widget _buildResult() {
     final a = _analysis;
 
-    // ── EXTRACT NESTED VALUES ──
     final court = a['court'] as Map<String, dynamic>? ?? {};
     final prediction = a['prediction'] as Map<String, dynamic>? ?? {};
     final timeline = a['timeline'] as Map<String, dynamic>? ?? {};
@@ -247,19 +305,15 @@ class _HomeScreenState extends State<HomeScreen> {
     final state = _safeString(court['state']);
     final riskScore = court['risk_score'] ?? 0.0;
     final pendingCases = court['pending_cases'] ?? 0;
-    final outcome = _safeString(prediction['outcome']);
-    final confidence = prediction['confidence'] ?? 0.0;
+
+    // NEW: success_probability (0-1) → 0-100%
+    final successProb = (prediction['success_probability'] ?? 0.0) * 100;
+    final confidence = (prediction['confidence'] ?? 0.0) * 100;
     final timelineDays = timeline['expected_days'] ?? 0;
 
-    // Risk Level
-    String riskLevel;
-    if (riskScore < 0.3) riskLevel = 'Low Risk';
-    else if (riskScore < 0.6) riskLevel = 'Medium Risk';
-    else riskLevel = 'High Risk';
-
-    // Overall Assessment
-    final isFavorable = outcome.toLowerCase().contains('favorable');
-    final overallAssessment = isFavorable ? 'GOOD' : 'BAD';
+    String riskLevel =
+        riskScore < 0.3 ? 'Low Risk' : riskScore < 0.6 ? 'Medium Risk' : 'High Risk';
+    final overallAssessment = successProb >= 60 ? 'GOOD' : 'BAD';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -268,19 +322,31 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           Row(
             children: [
-              Text('Hello ', style: GoogleFonts.poppins(fontSize: 24, color: Colors.black87)),
-              Text('$_userName!', style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.deepBlue)),
+              Text('Hello ',
+                  style: GoogleFonts.poppins(
+                      fontSize: 24, color: Colors.black87)),
+              Text('$_userName!',
+                  style: GoogleFonts.poppins(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.deepBlue)),
               const Spacer(),
-              CircleAvatar(radius: 24, backgroundColor: AppColors.deepBlue.withOpacity(0.2), child: const Icon(Icons.balance, color: AppColors.deepBlue)),
+              CircleAvatar(
+                  radius: 24,
+                  backgroundColor: AppColors.deepBlue.withOpacity(0.2),
+                  child: const Icon(Icons.balance,
+                      color: AppColors.deepBlue)),
             ],
           ),
           const SizedBox(height: 8),
-          Text("Here's your case overview for today.", style: GoogleFonts.poppins(fontSize: 15, color: Colors.black54)),
+          Text("Here's your case overview for today.",
+              style: GoogleFonts.poppins(fontSize: 15, color: Colors.black54)),
           const SizedBox(height: 24),
 
-          // ── CASE OUTLOOK SUMMARY ──
+          // ── SUMMARY ─────────────────────────────────────────────────────
           Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             elevation: 3,
             color: Colors.white,
             child: Padding(
@@ -288,20 +354,46 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('CASE OUTLOOK SUMMARY', style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black87)),
+                  Text('CASE OUTLOOK SUMMARY',
+                      style: GoogleFonts.poppins(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87)),
                   const SizedBox(height: 12),
-                  _summaryRow(icon: Icons.circle, color: overallAssessment == 'GOOD' ? Colors.orange : Colors.red, label: 'Overall Assessment:', value: overallAssessment, badge: true),
-                  _summaryRow(icon: Icons.location_city, label: 'Court', value: courtName),
-                  _summaryRow(icon: Icons.folder_open, label: 'Case Type', value: _selectedCaseType ?? 'N/A'),
-                  _summaryRow(icon: Icons.flag, label: 'Priority', value: _priority.isEmpty ? 'N/A' : _priority),
+                  _summaryRow(
+                      icon: Icons.circle,
+                      color: overallAssessment == 'GOOD'
+                          ? Colors.orange
+                          : Colors.red,
+                      label: 'Overall Assessment:',
+                      value: overallAssessment,
+                      badge: true),
+                  _summaryRow(
+                      icon: Icons.location_city,
+                      label: 'Court',
+                      value: courtName),
+                  _summaryRow(
+                      icon: Icons.folder_open,
+                      label: 'Case Type',
+                      value: _selectedCaseType ?? 'N/A'),
+                  _summaryRow(
+                      icon: Icons.flag,
+                      label: 'Priority',
+                      value: _priority.isEmpty ? 'N/A' : _priority),
                 ],
               ),
             ),
           ),
 
           const SizedBox(height: 20),
-          Text('KEY METRICS', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.deepBlue)),
+          Text('KEY METRICS',
+              style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.deepBlue)),
           const SizedBox(height: 12),
+
+          // ── METRICS GRID ───────────────────────────────────────────────
           GridView.count(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -310,35 +402,63 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisSpacing: 12,
             childAspectRatio: 1.8,
             children: [
-              _metricCard(icon: Icons.check_circle, color: Colors.green, title: 'Court Risk Level', value: riskLevel),
-              _metricCard(icon: Icons.close, color: Colors.red, title: 'Predicted Outcome', value: outcome),
-              _metricCard(icon: Icons.bar_chart, color: Colors.orange, title: 'Confidence', value: '$confidence%'),
-              _metricCard(icon: Icons.access_time, color: AppColors.deepBlue, title: 'Expected Timeline', value: '~$timelineDays days'),
+              _metricCard(
+                  icon: Icons.check_circle,
+                  color: Colors.green,
+                  title: 'Court Risk Level',
+                  value: riskLevel),
+              // NEW METRIC
+              _metricCard(
+                  icon: Icons.trending_up,
+                  color: Colors.blue,
+                  title: 'Success Probability',
+                  value: '${successProb.toStringAsFixed(0)}%'),
+              _metricCard(
+                  icon: Icons.bar_chart,
+                  color: Colors.orange,
+                  title: 'Confidence',
+                  value: '${confidence.toStringAsFixed(0)}%'),
+              _metricCard(
+                  icon: Icons.access_time,
+                  color: AppColors.deepBlue,
+                  title: 'Expected Timeline',
+                  value: '~$timelineDays days'),
             ],
           ),
 
           const SizedBox(height: 20),
           Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             elevation: 2,
             color: Colors.white,
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  Icon(isFavorable ? Icons.check_circle : Icons.warning, color: isFavorable ? Colors.green : Colors.orange, size: 28),
+                  Icon(
+                      successProb >= 60 ? Icons.check_circle : Icons.warning,
+                      color: successProb >= 60 ? Colors.green : Colors.orange,
+                      size: 28),
                   const SizedBox(width: 12),
-                  Expanded(child: Text('Court: $courtName, State: $state', style: GoogleFonts.poppins(fontSize: 14))),
+                  Expanded(
+                      child: Text('Court: $courtName, State: $state',
+                          style: GoogleFonts.poppins(fontSize: 14))),
                 ],
               ),
             ),
           ),
 
           const SizedBox(height: 20),
-          Text('Next Steps', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.deepBlue)),
+          Text('Next Steps',
+              style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.deepBlue)),
           const SizedBox(height: 12),
           Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             elevation: 2,
             color: Colors.white,
             child: Padding(
@@ -346,9 +466,11 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _stepRow(Icons.search, 'Monitor case status via eCourts portal'),
+                  _stepRow(Icons.search,
+                      'Monitor case status via eCourts portal'),
                   const SizedBox(height: 12),
-                  _stepRow(Icons.description, 'Prepare documentation per court guidelines'),
+                  _stepRow(Icons.description,
+                      'Prepare documentation per court guidelines'),
                 ],
               ),
             ),
@@ -360,7 +482,13 @@ class _HomeScreenState extends State<HomeScreen> {
               onPressed: _resetForm,
               icon: const Icon(Icons.refresh),
               label: const Text('New Analysis'),
-              style: OutlinedButton.styleFrom(foregroundColor: AppColors.deepBlue, side: const BorderSide(color: AppColors.deepBlue), padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25))),
+              style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.deepBlue,
+                  side: const BorderSide(color: AppColors.deepBlue),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(25))),
             ),
           ),
         ],
@@ -368,8 +496,14 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ── REUSABLE WIDGETS ──
-  Widget _buildDropdown({required String label, required String hint, required List<String> items, required String? value, required Function(String?) onChanged}) {
+  // ── REUSABLE WIDGETS ───────────────────────────────────────────────────
+  Widget _buildDropdown({
+    required String label,
+    required String hint,
+    required List<String> items,
+    required String? value,
+    required Function(String?) onChanged,
+  }) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 10),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -380,15 +514,24 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.deepBlue)),
+            Text(label,
+                style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.deepBlue)),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
               value: value,
-              hint: Text(hint, style: GoogleFonts.poppins(color: Colors.grey[600])),
-              items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+              hint: Text(hint,
+                  style: GoogleFonts.poppins(color: Colors.grey[600])),
+              items: items
+                  .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                  .toList(),
               onChanged: onChanged,
-              decoration: const InputDecoration(border: InputBorder.none, isDense: true),
-              icon: const Icon(Icons.arrow_drop_down, color: AppColors.deepBlue),
+              decoration:
+                  const InputDecoration(border: InputBorder.none, isDense: true),
+              icon: const Icon(Icons.arrow_drop_down,
+                  color: AppColors.deepBlue),
             ),
           ],
         ),
@@ -396,7 +539,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildInputField({required String label, required TextEditingController controller, required String hint, required Function(String) onChanged}) {
+  Widget _buildInputField({
+    required String label,
+    required TextEditingController controller,
+    required String hint,
+    required Function(String) onChanged,
+  }) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 10),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -407,12 +555,21 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.deepBlue)),
+            Text(label,
+                style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.deepBlue)),
             const SizedBox(height: 8),
             TextField(
               controller: controller,
               onChanged: onChanged,
-              decoration: InputDecoration(hintText: hint, hintStyle: GoogleFonts.poppins(color: Colors.grey[600]), border: InputBorder.none, isDense: true),
+              decoration: InputDecoration(
+                  hintText: hint,
+                  hintStyle:
+                      GoogleFonts.poppins(color: Colors.grey[600]),
+                  border: InputBorder.none,
+                  isDense: true),
             ),
           ],
         ),
@@ -420,8 +577,14 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _summaryRow({required IconData icon, required String label, required dynamic value, Color? color, bool badge = false}) {
-    String displayValue = _safeString(value);
+  Widget _summaryRow({
+    required IconData icon,
+    required String label,
+    required dynamic value,
+    Color? color,
+    bool badge = false,
+  }) {
+    final display = _safeString(value);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -429,7 +592,12 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           Icon(icon, size: 20, color: color ?? AppColors.deepBlue),
           const SizedBox(width: 12),
-          Expanded(flex: 2, child: Text(label, style: GoogleFonts.poppins(fontSize: 14, color: Colors.black.withOpacity(0.7)), softWrap: true)),
+          Expanded(
+              flex: 2,
+              child: Text(label,
+                  style: GoogleFonts.poppins(
+                      fontSize: 14, color: Colors.black.withOpacity(0.7)),
+                  softWrap: true)),
           const SizedBox(width: 8),
           Expanded(
             flex: 3,
@@ -438,11 +606,26 @@ class _HomeScreenState extends State<HomeScreen> {
               child: badge
                   ? Container(
                       constraints: const BoxConstraints(maxWidth: 120),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(color: (color ?? Colors.orange).withOpacity(0.2), borderRadius: BorderRadius.circular(20)),
-                      child: Text(displayValue, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: color ?? Colors.orange), textAlign: TextAlign.center, overflow: TextOverflow.ellipsis, maxLines: 1),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                          color: (color ?? Colors.orange).withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(20)),
+                      child: Text(display,
+                          style: GoogleFonts.poppins(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: color ?? Colors.orange),
+                          textAlign: TextAlign.center,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1),
                     )
-                  : Text(displayValue, style: GoogleFonts.poppins(fontSize: 14, color: Colors.black87), textAlign: TextAlign.end, overflow: TextOverflow.ellipsis, maxLines: 2),
+                  : Text(display,
+                      style: GoogleFonts.poppins(
+                          fontSize: 14, color: Colors.black87),
+                      textAlign: TextAlign.end,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2),
             ),
           ),
         ],
@@ -450,8 +633,13 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _metricCard({required IconData icon, required Color color, required String title, required dynamic value}) {
-    String displayValue = _safeString(value);
+  Widget _metricCard({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required dynamic value,
+  }) {
+    final display = _safeString(value);
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 2,
@@ -463,9 +651,19 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Icon(icon, color: color, size: 26),
             const SizedBox(height: 6),
-            Text(title, style: GoogleFonts.poppins(fontSize: 11, color: Colors.black54), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
+            Text(title,
+                style: GoogleFonts.poppins(
+                    fontSize: 11, color: Colors.black54),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis),
             const SizedBox(height: 4),
-            Text(displayValue, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
+            Text(display,
+                style: GoogleFonts.poppins(
+                    fontSize: 13, fontWeight: FontWeight.w600),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis),
           ],
         ),
       ),
@@ -477,7 +675,10 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         Icon(icon, color: AppColors.deepBlue, size: 20),
         const SizedBox(width: 12),
-        Expanded(child: Text(text, style: GoogleFonts.poppins(fontSize: 14, color: Colors.black87))),
+        Expanded(
+            child: Text(text,
+                style: GoogleFonts.poppins(
+                    fontSize: 14, color: Colors.black87))),
       ],
     );
   }

@@ -235,7 +235,7 @@ class _DocumentSummarizerScreenState extends State<DocumentSummarizerScreen> {
   String _error = '';
 
   static const String _geminiApiKey = 'AIzaSyAUOLlfY3S9sQzaIEijYqJscZq6tzv9rnI';
-  late final GenerativeModel _model = GenerativeModel(model: 'gemini-1.5-flash', apiKey: _geminiApiKey);
+  late final GenerativeModel _model = GenerativeModel(model: 'gemini-2.5-flash', apiKey: _geminiApiKey);
 
   Future<void> _pickAndSummarize() async {
     try {
@@ -394,7 +394,7 @@ class _FakeOrRealScreenState extends State<FakeOrRealScreen> {
   bool _isChecking = false;
 
   static const String _geminiApiKey = 'AIzaSyAUOLlfY3S9sQzaIEijYqJscZq6tzv9rnI';
-  late final GenerativeModel _model = GenerativeModel(model: 'gemini-1.5-flash', apiKey: _geminiApiKey);
+  late final GenerativeModel _model = GenerativeModel(model: 'gemini-2.5-flash', apiKey: _geminiApiKey);
 
   void _check() async {
     if (_controller.text.trim().isEmpty) return;
@@ -789,7 +789,7 @@ class _AskLawyerScreenState extends State<AskLawyerScreen> {
   bool _isAsking = false;
 
   static const String _geminiApiKey = 'AIzaSyAUOLlfY3S9sQzaIEijYqJscZq6tzv9rnI';
-  late final GenerativeModel _model = GenerativeModel(model: 'gemini-1.5-flash', apiKey: _geminiApiKey);
+  late final GenerativeModel _model = GenerativeModel(model: 'gemini-2.5-flash', apiKey: _geminiApiKey);
 
   void _ask() async {
     if (_questionController.text.trim().isEmpty) return;
