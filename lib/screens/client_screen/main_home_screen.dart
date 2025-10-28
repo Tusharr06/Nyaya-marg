@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:nyaya_marg/screens/client_screen/know_your_rights_hub.dart';
 import 'package:nyaya_marg/theme/colors.dart';
 
 // Import all screen files (we'll create them below)
@@ -22,7 +23,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
   static const List<Widget> _screens = <Widget>[
     HomeScreen(),
     ChatScreen(),
-    RightsScreen(),
+    KnowYourRightsHub(),
     ToolsScreen(),
     ProfileScreen(),
   ];

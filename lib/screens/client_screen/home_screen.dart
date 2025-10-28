@@ -79,63 +79,87 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _analyzeCase() async {
-    if (_selectedCity == null || _selectedCaseType == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select City and Case Type')),
-      );
+  if (_selectedCity == null || _selectedCaseType == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Please select City and Case Type')),
+    );
+    return;
+  }
+
+  setState(() {
+    _isAnalyzing = true;
+    _error = null;
+  });
+
+  try {
+    // ----- SEND JSON IN BODY (city, not state) -----
+    final Map<String, dynamic> requestBody = {
+      'city': _selectedCity!,          // <-- changed from 'state'
+      'case_type': _selectedCaseType!,
+      if (_priority.trim().isNotEmpty) 'priority': _priority.trim(),
+    };
+
+    print('POST → $_apiUrl');
+    print('Body → ${jsonEncode(requestBody)}');
+
+    final response = await http.post(
+      Uri.parse(_apiUrl),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode(requestBody),
+    ).timeout(const Duration(seconds: 30));
+
+    print('Status: ${response.statusCode}');
+    print('Response: ${response.body}');
+
+    // ----- SUCCESS -----
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      setState(() {
+        _analysis = data;
+        _showResult = true;
+        _isAnalyzing = false;
+      });
       return;
     }
 
-    setState(() {
-      _isAnalyzing = true;
-      _error = null;
-    });
+    // ----- 422 VALIDATION ERRORS -----
+    if (response.statusCode == 422) {
+      final errorData = jsonDecode(response.body);
+      final List<dynamic> details = errorData['detail'] ?? [];
 
-    try {
-      final Map<String, String> queryParams = {
-        'state': _selectedCity!,
-        'case_type': _selectedCaseType!,
-        if (_priority.trim().isNotEmpty) 'priority': _priority.trim(),
-      };
+      final errorLines = details.map((e) {
+        final loc = (e['loc'] as List).join(' → ');
+        final msg = e['msg'] as String;
+        return '$loc: $msg';
+      }).toList();
 
-      final uri = Uri.parse(_apiUrl).replace(queryParameters: queryParams);
-      print('POST → $uri');
-
-      final response = await http
-          .post(
-            uri,
-            headers: {'Accept': 'application/json'},
-          )
-          .timeout(const Duration(seconds: 30));
-
-      print('Status: ${response.statusCode}');
-      print('Response: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        setState(() {
-          _analysis = data;
-          _showResult = true;
-          _isAnalyzing = false;
-        });
-      } else {
-        setState(() {
-          _error = 'Server error: ${response.statusCode}\n${response.body}';
-          _isAnalyzing = false;
-        });
-      }
-    } on SocketException {
       setState(() {
-        _error = 'No internet connection.';
+        _error = 'Validation Error:\n${errorLines.join('\n')}';
         _isAnalyzing = false;
       });
-    } catch (e) {
-      setState(() {
-        _error = 'Request failed: $e';
-        _isAnalyzing = false;
-      });
+      return;
     }
+
+    // ----- OTHER ERRORS -----
+    setState(() {
+      _error = 'Server error: ${response.statusCode}\n${response.body}';
+      _isAnalyzing = false;
+    });
+  } on SocketException {
+    setState(() {
+      _error = 'No internet connection.';
+      _isAnalyzing = false;
+    });
+  } catch (e) {
+    setState(() {
+      _error = 'Request failed: $e';
+      _isAnalyzing = false;
+    });
   }
+}
 
   void _resetForm() {
     setState(() {

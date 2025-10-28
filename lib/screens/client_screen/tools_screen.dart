@@ -12,7 +12,7 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 
 /// =========================================================
-/// TOOLS HOME – 4 PERFECTLY SIZED CARDS → FULL SCREENS
+/// TOOLS HOME – 6 PERFECTLY SIZED CARDS → FULL SCREENS
 /// =========================================================
 class ToolsScreen extends StatelessWidget {
   const ToolsScreen({super.key});
@@ -27,7 +27,7 @@ class ToolsScreen extends StatelessWidget {
     {
       'icon': Icons.verified_rounded,
       'title': 'Fake or Real',
-      'subtitle': 'Check if notice or message is genuine',
+      'subtitle': 'AI checks if notice is genuine',
       'screen': FakeOrRealScreen(),
     },
     {
@@ -39,8 +39,20 @@ class ToolsScreen extends StatelessWidget {
     {
       'icon': Icons.search_rounded,
       'title': 'Track Case',
-      'subtitle': 'Live status (Demo Mode)',
+      'subtitle': 'Live status',
       'screen': TrackCaseScreen(),
+    },
+    {
+      'icon': Icons.question_answer_rounded,
+      'title': 'Ask a Lawyer',
+      'subtitle': 'Get instant AI legal advice',
+      'screen': AskLawyerScreen(),
+    },
+    {
+      'icon': Icons.gavel_rounded,
+      'title': 'Case Law Finder',
+      'subtitle': 'Search Indian judgments',
+      'screen': CaseLawFinderScreen(),
     },
   ];
 
@@ -65,7 +77,7 @@ class ToolsScreen extends StatelessWidget {
         backgroundColor: Colors.white,
         elevation: 0,
         foregroundColor: Colors.black,
-        centerTitle: false, // LEFT
+        centerTitle: false,
       ),
       body: SafeArea(
         child: Padding(
@@ -208,7 +220,7 @@ InputDecoration inputDecoration(String label, [IconData? icon]) => InputDecorati
     );
 
 /// =========================================================
-/// 1. DOCUMENT SUMMARIZER – LEFT TITLE
+/// 1. DOCUMENT SUMMARIZER
 /// =========================================================
 class DocumentSummarizerScreen extends StatefulWidget {
   const DocumentSummarizerScreen({super.key});
@@ -223,7 +235,7 @@ class _DocumentSummarizerScreenState extends State<DocumentSummarizerScreen> {
   String _error = '';
 
   static const String _geminiApiKey = 'AIzaSyAUOLlfY3S9sQzaIEijYqJscZq6tzv9rnI';
-  late final GenerativeModel _model = GenerativeModel(model: 'gemini-2.5-flash', apiKey: _geminiApiKey);
+  late final GenerativeModel _model = GenerativeModel(model: 'gemini-1.5-flash', apiKey: _geminiApiKey);
 
   Future<void> _pickAndSummarize() async {
     try {
@@ -298,14 +310,11 @@ $text
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text(
-          'Document Summarizer',
-          style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w600),
-        ),
+        title: Text('Document Summarizer', style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w600)),
         backgroundColor: Colors.white,
         elevation: 0,
         foregroundColor: Colors.black,
-        centerTitle: false, // LEFT
+        centerTitle: false,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -335,13 +344,7 @@ $text
                   child: Text('Selected: $_fileName', style: GoogleFonts.poppins(fontSize: 14, color: Colors.black54), textAlign: TextAlign.center),
                 ),
               if (_isLoading) buildLoader(),
-              if (_error.isNotEmpty)
-                Container(
-                  margin: const EdgeInsets.only(top: 24),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: Colors.red[50], borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.red)),
-                  child: Text(_error, style: const TextStyle(color: Colors.redAccent)),
-                ),
+              if (_error.isNotEmpty) buildError(_error),
               if (_summary.isNotEmpty)
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -377,7 +380,7 @@ $text
 }
 
 /// =========================================================
-/// 2. FAKE OR REAL – LEFT TITLE
+/// 2. FAKE OR REAL – USES GEMINI AI
 /// =========================================================
 class FakeOrRealScreen extends StatefulWidget {
   const FakeOrRealScreen({super.key});
@@ -390,26 +393,45 @@ class _FakeOrRealScreenState extends State<FakeOrRealScreen> {
   String _result = '';
   bool _isChecking = false;
 
+  static const String _geminiApiKey = 'AIzaSyAUOLlfY3S9sQzaIEijYqJscZq6tzv9rnI';
+  late final GenerativeModel _model = GenerativeModel(model: 'gemini-1.5-flash', apiKey: _geminiApiKey);
+
   void _check() async {
     if (_controller.text.trim().isEmpty) return;
 
     setState(() => _isChecking = true);
-    await Future.delayed(const Duration(seconds: 2));
 
-    final text = _controller.text.toLowerCase();
-    final isGenuine = text.contains('court') ||
-        text.contains('summons') ||
-        text.contains('notice') ||
-        text.contains('advocate') ||
-        text.contains('section') ||
-        text.contains('ipc');
+    try {
+      final prompt = Content.text('''
+You are a legal authenticity expert. Analyze the following message and determine if it's likely **genuine** or **fake**.
 
-    setState(() {
-      _isChecking = false;
-      _result = isGenuine
-          ? '**Likely Genuine**\n\nContains legal keywords like "court", "summons", "notice", "IPC".'
-          : '**Suspicious**\n\nNo legal terms found. Could be fake.';
-    });
+Respond in **Markdown** with:
+- **Verdict**: Genuine / Suspicious / Fake
+- **Confidence**: High / Medium / Low
+- **Reasons**: 3–5 bullet points
+
+Focus on:
+- Grammar & spelling
+- Legal terminology
+- Formatting & tone
+- Urgency & threats
+- Contact details
+
+Message:
+${_controller.text}
+''');
+
+      final response = await _model.generateContent([prompt]);
+      setState(() {
+        _result = response.text ?? 'No result.';
+        _isChecking = false;
+      });
+    } catch (e) {
+      setState(() {
+        _result = 'Error: $e';
+        _isChecking = false;
+      });
+    }
   }
 
   @override
@@ -419,28 +441,24 @@ class _FakeOrRealScreenState extends State<FakeOrRealScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text(
-          'Fake or Real',
-          style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w600),
-        ),
+        title: Text('Fake or Real', style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w600)),
         backgroundColor: Colors.white,
         elevation: 0,
         foregroundColor: Colors.black,
-        centerTitle: false, // LEFT
+        centerTitle: false,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: EdgeInsets.all(isSmall ? 16 : 20),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             children: [
               buildIcon(isSmall, Icons.verified_rounded),
               const SizedBox(height: 20),
-              buildDescription(isSmall, 'Paste any legal notice to verify authenticity.'),
+              buildDescription(isSmall, 'Paste any legal notice – AI checks authenticity.'),
               const SizedBox(height: 24),
               TextField(
                 controller: _controller,
-                maxLines: 5,
+                maxLines: 6,
                 decoration: InputDecoration(
                   hintText: 'Paste message here...',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -449,9 +467,9 @@ class _FakeOrRealScreenState extends State<FakeOrRealScreen> {
               ),
               const SizedBox(height: 20),
               ElevatedButton.icon(
-                onPressed: _controller.text.isEmpty ? null : _check,
+                onPressed: _controller.text.isEmpty || _isChecking ? null : _check,
                 icon: const Icon(Icons.security),
-                label: const Text('Verify'),
+                label: Text(_isChecking ? 'Analyzing...' : 'Verify'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryBlue,
                   foregroundColor: Colors.white,
@@ -459,11 +477,10 @@ class _FakeOrRealScreenState extends State<FakeOrRealScreen> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
-              const SizedBox(height: 24),
-              if (_isChecking)
-                buildLoader()
-              else if (_result.isNotEmpty)
+              if (_isChecking) buildLoader(),
+              if (_result.isNotEmpty)
                 Container(
+                  margin: const EdgeInsets.only(top: 24),
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -478,6 +495,7 @@ class _FakeOrRealScreenState extends State<FakeOrRealScreen> {
                     physics: const NeverScrollableScrollPhysics(),
                     styleSheet: MarkdownStyleSheet(
                       p: GoogleFonts.poppins(fontSize: 15, height: 1.6),
+                      strong: GoogleFonts.poppins(fontWeight: FontWeight.w700),
                     ),
                   ),
                 ),
@@ -491,7 +509,7 @@ class _FakeOrRealScreenState extends State<FakeOrRealScreen> {
 }
 
 /// =========================================================
-/// 3. ADD CASE – LEFT TITLE
+/// 3. ADD CASE
 /// =========================================================
 class AddCaseScreen extends StatefulWidget {
   const AddCaseScreen({super.key});
@@ -512,14 +530,11 @@ class _AddCaseScreenState extends State<AddCaseScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text(
-          'Add Case',
-          style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w600),
-        ),
+        title: Text('Add Case', style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w600)),
         backgroundColor: Colors.white,
         elevation: 0,
         foregroundColor: Colors.black,
-        centerTitle: false, // LEFT
+        centerTitle: false,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -580,7 +595,7 @@ class _AddCaseScreenState extends State<AddCaseScreen> {
 }
 
 /// =========================================================
-/// 4. TRACK CASE – LEFT TITLE
+/// 4. TRACK CASE
 /// =========================================================
 class TrackCaseScreen extends StatefulWidget {
   const TrackCaseScreen({super.key});
@@ -689,14 +704,11 @@ class _TrackCaseScreenState extends State<TrackCaseScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text(
-          'Track Case',
-          style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w600),
-        ),
+        title: Text('Track Case', style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w600)),
         backgroundColor: Colors.white,
         elevation: 0,
         foregroundColor: Colors.black,
-        centerTitle: false, // LEFT
+        centerTitle: false,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -705,7 +717,7 @@ class _TrackCaseScreenState extends State<TrackCaseScreen> {
             children: [
               buildIcon(isSmall, Icons.search_rounded),
               const SizedBox(height: 20),
-              buildDescription(isSmall, 'Enter case number and court to check live status. (Demo Mode)'),
+              buildDescription(isSmall, 'Enter case number and court to check live status'),
               const SizedBox(height: 32),
               TextField(
                 controller: _caseNo,
@@ -752,6 +764,260 @@ class _TrackCaseScreenState extends State<TrackCaseScreen> {
                       listBullet: GoogleFonts.poppins(),
                     ),
                   ),
+                ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// =========================================================
+/// 5. ASK A LAWYER – AI LEGAL Q&A
+/// =========================================================
+class AskLawyerScreen extends StatefulWidget {
+  const AskLawyerScreen({super.key});
+  @override
+  State<AskLawyerScreen> createState() => _AskLawyerScreenState();
+}
+
+class _AskLawyerScreenState extends State<AskLawyerScreen> {
+  final _questionController = TextEditingController();
+  String _answer = '';
+  bool _isAsking = false;
+
+  static const String _geminiApiKey = 'AIzaSyAUOLlfY3S9sQzaIEijYqJscZq6tzv9rnI';
+  late final GenerativeModel _model = GenerativeModel(model: 'gemini-1.5-flash', apiKey: _geminiApiKey);
+
+  void _ask() async {
+    if (_questionController.text.trim().isEmpty) return;
+
+    setState(() {
+      _isAsking = true;
+      _answer = '';
+    });
+
+    try {
+      final prompt = Content.text('''
+You are a senior Indian lawyer. Answer the user's legal question in **simple, clear Hindi/English mix** (use English terms where needed).
+
+Respond in **Markdown** with:
+- **Answer**: 2–3 short sentences
+- **Key Points**: 3–5 bullets
+- **Next Steps**: 1–2 actions
+- **Disclaimer**: This is AI-generated advice, not a substitute for professional legal consultation.
+
+Question: ${_questionController.text}
+''');
+
+      final response = await _model.generateContent([prompt]);
+      setState(() {
+        _answer = (response.text ?? 'No answer received.').trim();
+        _isAsking = false;
+      });
+    } catch (e) {
+      setState(() {
+        _answer = 'Error: $e';
+        _isAsking = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isSmall = MediaQuery.of(context).size.height < 700;
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: Text('Ask a Lawyer', style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w600)),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        foregroundColor: Colors.black,
+        centerTitle: false,
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.all(isSmall ? 16 : 20),
+          child: Column(
+            children: [
+              buildIcon(isSmall, Icons.question_answer_rounded),
+              const SizedBox(height: 20),
+              buildDescription(isSmall, 'Ask any legal question – get instant AI-powered advice.'),
+              const SizedBox(height: 24),
+              TextField(
+                controller: _questionController,
+                maxLines: 4,
+                decoration: InputDecoration(
+                  hintText: 'e.g., Can police arrest without warrant? What is Section 498A?',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  contentPadding: const EdgeInsets.all(16),
+                ),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: _questionController.text.isEmpty || _isAsking ? null : _ask,
+                icon: const Icon(Icons.smart_toy),
+                label: Text(_isAsking ? 'Thinking...' : 'Ask AI Lawyer'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryBlue,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              if (_isAsking) buildLoader(),
+              if (_answer.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.only(top: 24),
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.purple[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.purple),
+                  ),
+                  child: Markdown(
+                    data: _answer,
+                    selectable: true,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    styleSheet: MarkdownStyleSheet(
+                      p: GoogleFonts.poppins(fontSize: 15, height: 1.7),
+                      listBullet: GoogleFonts.poppins(fontSize: 14),
+                      strong: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: AppColors.primaryBlue),
+                      em: GoogleFonts.poppins(fontStyle: FontStyle.italic),
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// =========================================================
+/// 6. CASE LAW FINDER (DEMO)
+/// =========================================================
+class CaseLawFinderScreen extends StatefulWidget {
+  const CaseLawFinderScreen({super.key});
+  @override
+  State<CaseLawFinderScreen> createState() => _CaseLawFinderScreenState();
+}
+
+class _CaseLawFinderScreenState extends State<CaseLawFinderScreen> {
+  final _queryController = TextEditingController();
+  List<Map<String, String>> _results = [];
+  bool _isSearching = false;
+
+  final List<Map<String, String>> _mockCases = [
+    {
+      'title': 'Kesavananda Bharati v. State of Kerala',
+      'citation': '(1973) 4 SCC 225',
+      'court': 'Supreme Court of India',
+      'summary': 'Established the **basic structure doctrine**. Parliament cannot amend fundamental rights.',
+    },
+    {
+      'title': 'Shreya Singhal v. Union of India',
+      'citation': '(2015) 5 SCC 1',
+      'court': 'Supreme Court of India',
+      'summary': 'Struck down **Section 66A** of IT Act as unconstitutional.',
+    },
+    {
+      'title': 'Vishaka v. State of Rajasthan',
+      'citation': '(1997) 6 SCC 241',
+      'court': 'Supreme Court of India',
+      'summary': 'Laid down **guidelines against sexual harassment** at workplace.',
+    },
+  ];
+
+  void _search() {
+    final query = _queryController.text.toLowerCase();
+    if (query.isEmpty) return;
+
+    setState(() => _isSearching = true);
+
+    Future.delayed(const Duration(seconds: 1), () {
+      final filtered = _mockCases.where((c) => c['title']!.toLowerCase().contains(query) || c['summary']!.toLowerCase().contains(query)).toList();
+      setState(() {
+        _results = filtered;
+        _isSearching = false;
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isSmall = MediaQuery.of(context).size.height < 700;
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: Text('Case Law Finder', style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w600)),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        foregroundColor: Colors.black,
+        centerTitle: false,
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.all(isSmall ? 16 : 20),
+          child: Column(
+            children: [
+              buildIcon(isSmall, Icons.gavel_rounded),
+              const SizedBox(height: 20),
+              buildDescription(isSmall, 'Search landmark Indian judgments.'),
+              const SizedBox(height: 24),
+              TextField(
+                controller: _queryController,
+                decoration: inputDecoration('Search Cases', Icons.search),
+                onSubmitted: (_) => _search(),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: _isSearching ? null : _search,
+                icon: const Icon(Icons.search),
+                label: const Text('Search'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryBlue,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              if (_isSearching) buildLoader(),
+              if (_results.isNotEmpty)
+                Column(
+                  children: _results.map((c) => Container(
+                    margin: const EdgeInsets.only(top: 16),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.indigo[50],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.indigo),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(c['title']!, style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 15)),
+                        Text(c['citation']!, style: GoogleFonts.poppins(fontSize: 13, color: Colors.black54)),
+                        const SizedBox(height: 8),
+                        Text(c['summary']!, style: GoogleFonts.poppins(fontSize: 14)),
+                      ],
+                    ),
+                  )).toList(),
+                ),
+              if (!_isSearching && _results.isEmpty && _queryController.text.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.only(top: 24),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(12)),
+                  child: Text('No cases found.', style: GoogleFonts.poppins()),
                 ),
               const SizedBox(height: 20),
             ],
