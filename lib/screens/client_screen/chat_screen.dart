@@ -1,11 +1,12 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart'; 
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:nyaya_marg/auth_screens/service/gemini_service.dart';
 import 'package:nyaya_marg/theme/colors.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
-
   @override
   State<ChatScreen> createState() => _ChatScreenState();
 }
@@ -25,11 +26,12 @@ class _ChatScreenState extends State<ChatScreen> {
 
   bool _isTyping = false;
 
-  void _sendMessage() {
-    if (_controller.text.trim().isEmpty) return;
+  Future<void> _sendMessage() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty) return;
 
     final userMsg = ChatMessage(
-      text: _controller.text.trim(),
+      text: text,
       isUser: true,
       timestamp: DateTime.now(),
     );
@@ -42,29 +44,38 @@ class _ChatScreenState extends State<ChatScreen> {
     _controller.clear();
     _scrollToBottom();
 
-    // Simulate AI reply
-    Future.delayed(const Duration(seconds: 2), () {
+    // ---------- ENGLISH-ONLY LEGAL PROMPT ----------
+    final prompt = """
+You are Nyaya Marg AI, a professional legal assistant for Indian law.
+Answer **in English only**, keep it concise (3-5 sentences), cite sections.
+Use **markdown** for bold: **Section 138**.
+User query: "$text"
+""";
+
+    try {
+      final aiReply = await GeminiService.generate(prompt);
       if (!mounted) return;
+
       setState(() {
         _messages.add(ChatMessage(
-          text: _aiResponse(userMsg.text),
+          text: aiReply,
           isUser: false,
           timestamp: DateTime.now(),
         ));
         _isTyping = false;
       });
-      _scrollToBottom();
-    });
-  }
-
-  String _aiResponse(String input) {
-    final replies = [
-      "I understand your concern. Let me help you with that.",
-      "Based on your query, here's what I recommend...",
-      "That’s a valid point. Let me explain in detail.",
-      "I can assist you with drafting, rights, or legal steps.",
-    ];
-    return replies[DateTime.now().millisecond % replies.length];
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _messages.add(ChatMessage(
+          text: "Sorry, the AI is having trouble. Try again!",
+          isUser: false,
+          timestamp: DateTime.now(),
+        ));
+        _isTyping = false;
+      });
+    }
+    _scrollToBottom();
   }
 
   void _scrollToBottom() {
@@ -82,7 +93,6 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // ───── White AppBar with Black Text & Icons ─────
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 2,
@@ -122,12 +132,9 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
         ),
       ),
-
-      // ───── Body (light background) ─────
       backgroundColor: AppColors.backgroundColor,
       body: Column(
         children: [
-          // ───── Chat list ─────
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
@@ -141,8 +148,7 @@ class _ChatScreenState extends State<ChatScreen> {
               },
             ),
           ),
-
-          // ───── Input bar ─────
+          // ───── INPUT BAR ─────
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
@@ -198,13 +204,12 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  // ───── Message bubble ─────
+  // ───── BUBBLE (uses Markdown for bold) ─────
   Widget _messageBubble(ChatMessage msg) {
     final bool isUser = msg.isUser;
     final Color bubble = isUser
         ? AppColors.deepBlue
         : AppColors.lightBlue.withOpacity(0.9);
-    final Color textCol = isUser ? Colors.white : Colors.black87;
     final CrossAxisAlignment align =
         isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start;
 
@@ -216,8 +221,7 @@ class _ChatScreenState extends State<ChatScreen> {
           Container(
             constraints: BoxConstraints(
                 maxWidth: MediaQuery.of(context).size.width * 0.75),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: bubble,
               borderRadius: BorderRadius.only(
@@ -236,14 +240,26 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ],
             ),
-            child: Text(
-              msg.text,
-              style: GoogleFonts.poppins(
-                color: textCol,
-                fontSize: 15,
-                height: 1.4,
-              ),
-            ),
+            child: isUser
+                ? Text(
+                    msg.text,
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontSize: 15,
+                      height: 1.4,
+                    ),
+                  )
+                : MarkdownBody(
+                    data: msg.text,
+                    styleSheet: MarkdownStyleSheet(
+                      p: GoogleFonts.poppins(
+                        color: Colors.black87,
+                        fontSize: 15,
+                        height: 1.4,
+                      ),
+                      strong: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
           ),
           const SizedBox(height: 4),
           Text(
@@ -258,7 +274,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  // ───── Typing indicator ─────
+  // ───── TYPING INDICATOR (unchanged) ─────
   Widget _typingIndicator() {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -271,8 +287,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           const SizedBox(width: 12),
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
               color: AppColors.lightBlue.withOpacity(0.7),
               borderRadius: BorderRadius.circular(16),
@@ -302,12 +317,15 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 }
 
-// ───── Model ─────
+// ───── MODEL ─────
 class ChatMessage {
   final String text;
   final bool isUser;
   final DateTime timestamp;
 
-  ChatMessage(
-      {required this.text, required this.isUser, required this.timestamp});
+  ChatMessage({
+    required this.text,
+    required this.isUser,
+    required this.timestamp,
+  });
 }
