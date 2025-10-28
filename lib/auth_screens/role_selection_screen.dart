@@ -47,7 +47,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Image.asset('assets/logo.png', width: 140, height: 140),
+              Image.asset('assets/logo.png', width: 240, height: 240),
               const SizedBox(height: 40),
               Text(
                 'Who are you?',
