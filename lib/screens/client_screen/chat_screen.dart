@@ -3,6 +3,7 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:nyaya_marg/auth_screens/service/gemini_service.dart';
+import 'package:nyaya_marg/screens/client_screen/home_screen.dart';
 import 'package:nyaya_marg/theme/colors.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -97,10 +98,14 @@ User query: "$text"
         backgroundColor: Colors.white,
         elevation: 2,
         shadowColor: AppColors.shadowGrey.withOpacity(0.15),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
+        // leading: IconButton(
+        //   icon: const Icon(Icons.arrow_back, color: Colors.black),
+        //   onPressed: () { 
+        //       Navigator.of(context).pushReplacement(
+        //       MaterialPageRoute(builder: (_) => const HomeScreen()), 
+        //     );
+        //   },
+        // ),
         title: Row(
           children: [
             CircleAvatar(
