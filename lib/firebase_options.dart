@@ -4,24 +4,15 @@ import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
 
-/// Default [FirebaseOptions] for use with your Firebase apps.
-///
-/// Example:
-/// ```dart
-/// import 'firebase_options.dart';
-/// // ...
-/// await Firebase.initializeApp(
-///   options: DefaultFirebaseOptions.currentPlatform,
-/// );
-/// ```
+
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
-    if (kIsWeb) {
+    if (kIsWeb)
       throw UnsupportedError(
         'DefaultFirebaseOptions have not been configured for web - '
         'you can reconfigure this by running the FlutterFire CLI again.',
       );
-    }
+
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
         return android;
@@ -50,11 +41,11 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyB6FFuVTREcTrogrKIVh1ZBR1zkFMr53WA',
-    appId: '1:62948481801:android:135e3dd41207b7799991d8',
-    messagingSenderId: '62948481801',
-    projectId: 'nyayamarg',
-    storageBucket: 'nyayamarg.firebasestorage.app',
+    apiKey: 'AIzaSyA2CI8uy0YW4BPxc2RQzvKXxfPn6ab4a4Y',
+    appId: '1:753801306682:android:a2a7c487fd9676dc67cb03',
+    messagingSenderId: '753801306682',
+    projectId: 'nyaymarg',
+    storageBucket: 'nyaymarg.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(

@@ -1,13 +1,15 @@
 // lib/screens/lawyer_home_screen.dart
-import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:nyaya_marg/screens/client_screen/chat_screen.dart';
 import 'package:nyaya_marg/screens/client_screen/tools_screen.dart';
 import 'package:nyaya_marg/theme/colors.dart';
-import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:nyaya_marg/screens/lawyer_screens/justice_graph/backlog_risk_screen.dart';
+import 'package:nyaya_marg/screens/lawyer_screens/justice_graph/case_duration_screen.dart';
+import 'package:nyaya_marg/screens/lawyer_screens/justice_graph/district_investigation_screen.dart';
 
 class LawyerHomeScreen extends StatefulWidget {
   const LawyerHomeScreen({super.key});
@@ -17,33 +19,9 @@ class LawyerHomeScreen extends StatefulWidget {
 }
 
 class _LawyerHomeScreenState extends State<LawyerHomeScreen> {
-  // Form
-  String? _selectedCity;
-  String? _selectedCaseType;
-  String? _selectedPriority;
-  final _priorityOptions = ['Low', 'Medium', 'High'];
-
   // UI
   String _userName = 'Advocate';
   bool _isLoadingUser = true;
-  bool _isAnalyzing = false;
-  bool _showResult = false;
-  Map<String, dynamic> _analysis = {};
-  String? _error;
-
-  // Gemini API
-  final String _geminiApiKey = 'AIzaSyAUOLlfY3S9sQzaIEijYqJscZq6tzv9rnI';
-  GenerativeModel? _model;
-
-  // Dropdowns
-  final List<String> _cities = [
-    'Ahmedabad', 'Bangalore', 'Chandigarh', 'Chennai', 'Delhi',
-    'Hyderabad', 'Jaipur', 'Kochi', 'Kolkata', 'Lucknow', 'Pune'
-  ];
-  final List<String> _caseTypes = [
-    'Wrongful Termination', 'Employment', 'Property Dispute', 'Property',
-    'Road Accident', 'Other'
-  ];
 
   // Mock Citizen Cases
   final List<Map<String, String>> _citizenCases = [
@@ -56,18 +34,6 @@ class _LawyerHomeScreenState extends State<LawyerHomeScreen> {
   void initState() {
     super.initState();
     _loadUserName();
-    _initGemini();
-  }
-
-  Future<void> _initGemini() async {
-    if (_geminiApiKey.startsWith('YOUR_') || _geminiApiKey.isEmpty) {
-      setState(() => _error = 'Gemini API key not set!');
-      return;
-    }
-    _model = GenerativeModel(
-      model: 'gemini-1.5-flash',
-      apiKey: _geminiApiKey,
-    );
   }
 
   Future<void> _loadUserName() async {
@@ -84,106 +50,6 @@ class _LawyerHomeScreenState extends State<LawyerHomeScreen> {
     }
   }
 
-  // ── SAFE STRING ──
-  String _safeString(dynamic value) {
-    if (value == null) return 'N/A';
-    if (value is String) return value;
-    if (value is num) return value.toStringAsFixed(2).replaceAll(RegExp(r'0+$'), '').replaceAll(RegExp(r'\.$'), '');
-    try {
-      return jsonEncode(value);
-    } catch (_) {
-      return value.toString();
-    }
-  }
-
-  // ── ANALYZE CASE USING GEMINI ──
-  Future<void> _analyzeCase() async {
-    if (_selectedCity == null || _selectedCaseType == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select City and Case Type')),
-      );
-      return;
-    }
-
-    if (_model == null) {
-      setState(() => _error = 'Gemini model not initialized. Check API key.');
-      return;
-    }
-
-    setState(() {
-      _isAnalyzing = true;
-      _error = null;
-    });
-
-    try {
-      final prompt = '''
-You are a legal AI assistant for Indian courts. Analyze the case:
-
-- City: $_selectedCity
-- Case Type: $_selectedCaseType
-- Priority: ${_selectedPriority ?? 'Not specified'}
-
-Return **exactly** this JSON (no extra text):
-
-{
-  "court": {
-    "name": "string",
-    "state": "string",
-    "risk_score": 0.0-1.0,
-    "pending_cases": integer
-  },
-  "prediction": {
-    "success_probability": 0.0-1.0,
-    "confidence": 0.76-1.0   // ALWAYS >= 0.76
-  },
-  "timeline": {
-    "expected_days": integer
-  }
-}
-
-Use realistic Indian court data. **confidence must be >= 0.76**.
-''';
-
-      final content = [Content.text(prompt)];
-      final response = await _model!.generateContent(content);
-
-      final text = response.text ?? '';
-      final jsonMatch = RegExp(r'\{.*\}', dotAll: true).firstMatch(text);
-
-      if (jsonMatch == null) throw Exception('No JSON in response');
-
-      final data = jsonDecode(jsonMatch.group(0)!) as Map<String, dynamic>;
-
-      // Enforce confidence >= 76%
-      final prediction = data['prediction'] as Map<String, dynamic>? ?? {};
-      final confidence = prediction['confidence'] as num? ?? 0.0;
-      if (confidence < 0.76) {
-        prediction['confidence'] = 0.76 + (confidence * 0.24);
-      }
-
-      setState(() {
-        _analysis = data;
-        _showResult = true;
-        _isAnalyzing = false;
-      });
-    } catch (e) {
-      setState(() {
-        _error = 'Gemini Error: $e';
-        _isAnalyzing = false;
-      });
-    }
-  }
-
-  void _resetForm() {
-    setState(() {
-      _selectedCity = null;
-      _selectedCaseType = null;
-      _selectedPriority = null;
-      _showResult = false;
-      _error = null;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     if (_isLoadingUser) {
@@ -191,418 +57,265 @@ Use realistic Indian court data. **confidence must be >= 0.76**.
     }
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundColor,
+      backgroundColor: const Color(0xFFF9FAFB),
       floatingActionButton: FloatingActionButton(
         backgroundColor: AppColors.deepBlue,
-        child: const Icon(Icons.chat, color: Colors.white),
+        elevation: 4,
+        child: const Icon(Icons.chat_bubble_outline, color: Colors.white),
         onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChatScreen())),
       ),
-      body: SafeArea(child: _showResult ? _buildResult() : _buildForm()),
+      body: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent),
+        child: _buildDashboard(),
+      ),
     );
   }
 
-  // ── FORM UI ──
-  Widget _buildForm() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Hello $_userName!', style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.deepBlue)),
-          const SizedBox(height: 8),
-          Text('Analyze cases with AI-powered insights.', style: GoogleFonts.poppins(fontSize: 15, color: Colors.black87)),
-          const SizedBox(height: 24),
-
-          _buildDropdown(
-            label: 'City',
-            hint: 'Select city',
-            items: _cities,
-            value: _selectedCity,
-            onChanged: (v) => setState(() => _selectedCity = v),
-          ),
-          _buildDropdown(
-            label: 'Case Type',
-            hint: 'Select case type',
-            items: _caseTypes,
-            value: _selectedCaseType,
-            onChanged: (v) => setState(() => _selectedCaseType = v),
-          ),
-          _buildDropdown(
-            label: 'Priority',
-            hint: 'Select priority',
-            items: _priorityOptions,
-            value: _selectedPriority,
-            onChanged: (v) => setState(() => _selectedPriority = v),
-          ),
-
-          const SizedBox(height: 32),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _isAnalyzing ? null : _analyzeCase,
-              icon: _isAnalyzing
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.analytics),
-              label: Text(_isAnalyzing ? 'ANALYZING...' : 'ANALYZE CASE'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: AppColors.deepBlue,
-                elevation: 3,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(25),
-                  side: const BorderSide(color: AppColors.deepBlue, width: 1.5),
-                ),
-              ),
-            ),
-          ),
-
-          if (_error != null) ...[
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
+  Widget _buildDashboard() {
+    return CustomScrollView(
+      physics: const BouncingScrollPhysics(),
+      slivers: [
+        // PREMIUM SLIVER HEADER
+        SliverAppBar(
+          expandedHeight: 180,
+          floating: false,
+          pinned: false, // ENSURE IT SCROLLS AWAY COMPLETELY
+          elevation: 0,
+          backgroundColor: AppColors.deepBlue,
+          flexibleSpace: FlexibleSpaceBar(
+            background: Container(
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.red.withOpacity(0.3)),
+                gradient: LinearGradient(
+                  colors: [AppColors.deepBlue, AppColors.deepBlue.withValues(alpha: 0.8)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(32),
+                  bottomRight: Radius.circular(32),
+                ),
               ),
-              child: Row(
-                children: [
-                  const Icon(Icons.error_outline, color: Colors.red, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(_error!, style: GoogleFonts.poppins(color: Colors.red, fontSize: 14))),
-                ],
-              ),
-            ),
-          ],
-
-          const SizedBox(height: 32),
-
-          // CITIZEN CASES
-          Text('Choose your case', style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 140,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: _citizenCases.length,
-              itemBuilder: (ctx, i) {
-                final c = _citizenCases[i];
-                return Container(
-                  width: 240,
-                  margin: const EdgeInsets.only(right: 16),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8)],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(c['title']!, style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 15)),
-                      const SizedBox(height: 4),
-                      Text(c['category']!, style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[700])),
-                      const Spacer(),
-                      ElevatedButton(
-                        onPressed: () {},
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primaryBlue,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Hello $_userName!',
+                          style: GoogleFonts.outfit(
+                            fontSize: 26,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
-                        child: Text('View More', style: GoogleFonts.poppins(fontSize: 12, color: Colors.white)),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
-          // TOOLS
-          Row(
-            children: [
-              Expanded(
-                child: _buildFeatureTile(
-                  'Document Summarizer',
-                  Icons.description,
-                  Colors.orange,
-                  () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DocumentSummarizerScreen())),
+                        Text(
+                          'Manage your legal workspace',
+                          style: GoogleFonts.outfit(
+                            fontSize: 14,
+                            color: Colors.white.withValues(alpha: 0.8),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Spacer(),
+                    CircleAvatar(
+                      radius: 22,
+                      backgroundColor: Colors.white.withValues(alpha: 0.2),
+                      child: const Icon(Icons.person, color: Colors.white),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildFeatureTile(
-                  'Precedent Finder',
-                  Icons.gavel,
-                  Colors.purple,
-                  () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrecedentFinderScreen())),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 80),
-        ],
-      ),
-    );
-  }
-
-  // ── RESULT UI (4 METRICS - FIXED) ──
-  Widget _buildResult() {
-    final a = _analysis;
-    final court = a['court'] as Map<String, dynamic>? ?? {};
-    final prediction = a['prediction'] as Map<String, dynamic>? ?? {};
-    final timeline = a['timeline'] as Map<String, dynamic>? ?? {};
-
-    final courtName = _safeString(court['name']);
-    final state = _safeString(court['state']);
-    final riskScore = court['risk_score'] ?? 0.0;
-    final pendingCases = court['pending_cases'] ?? 0; // Fixed: was 'pendingdingCases'
-
-    final successProb = (prediction['success_probability'] ?? 0.0) * 100;
-    final confidence = (prediction['confidence'] ?? 0.0) * 100;
-    final timelineDays = timeline['expected_days'] ?? 0;
-
-    // ── OVERALL ASSESSMENT (all 4 must be good) ──
-    final isHighSuccess = successProb >= 60;
-    final isLowRisk = riskScore < 0.4;
-    final isLowBacklog = pendingCases < 5000; // Fixed typo
-    final isHighConfidence = confidence >= 76;
-
-    final overallAssessment = (isHighSuccess && isLowRisk && isLowBacklog && isHighConfidence) ? 'GOOD' : 'BAD';
-
-    String riskLevel = riskScore < 0.3 ? 'Low Risk' : riskScore < 0.6 ? 'Medium Risk' : 'High Risk';
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text('Hello ', style: GoogleFonts.poppins(fontSize: 24, color: Colors.black87)),
-              Text('$_userName!', style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.deepBlue)),
-              const Spacer(),
-              CircleAvatar(radius: 24, backgroundColor: AppColors.deepBlue.withOpacity(0.2), child: const Icon(Icons.balance, color: AppColors.deepBlue)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text("Here's your case overview for today.", style: GoogleFonts.poppins(fontSize: 15, color: Colors.black54)),
-          const SizedBox(height: 24),
-
-          // CASE OUTLOOK SUMMARY
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            elevation: 3,
-            color: Colors.white,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('CASE OUTLOOK SUMMARY', style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black87)),
-                  const SizedBox(height: 12),
-                  _summaryRow(
-                    icon: Icons.circle,
-                    color: overallAssessment == 'GOOD' ? Colors.orange : Colors.red,
-                    label: 'Overall Assessment:',
-                    value: overallAssessment,
-                    badge: true,
-                  ),
-                  _summaryRow(icon: Icons.location_city, label: 'Court', value: courtName),
-                  _summaryRow(icon: Icons.folder_open, label: 'Case Type', value: _selectedCaseType ?? 'N/A'),
-                  _summaryRow(icon: Icons.flag, label: 'Priority', value: _selectedPriority ?? 'N/A'),
-                ],
-              ),
             ),
           ),
-
-          const SizedBox(height: 20),
-          Text('KEY METRICS', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.deepBlue)),
-          const SizedBox(height: 12),
-          GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 2,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 1.8,
-            children: [
-              _metricCard(icon: Icons.shield, color: Colors.green, title: 'Court Risk Level', value: riskLevel),
-              _metricCard(icon: Icons.cases, color: Colors.blue, title: 'Pending Cases', value: '$pendingCases'),
-              _metricCard(icon: Icons.access_time, color: AppColors.deepBlue, title: 'Expected Timeline', value: '~$timelineDays days'),
-              _metricCard(icon: Icons.bar_chart, color: Colors.orange, title: 'Confidence', value: '${confidence.toStringAsFixed(0)}%'),
-            ],
-          ),
-
-          const SizedBox(height: 20),
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            elevation: 2,
-            color: Colors.white,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Icon(overallAssessment == 'GOOD' ? Icons.check_circle : Icons.warning,
-                      color: overallAssessment == 'GOOD' ? Colors.green : Colors.orange, size: 28),
-                  const SizedBox(width: 12),
-                  Expanded(child: Text('Court: $courtName, State: $state', style: GoogleFonts.poppins(fontSize: 14))),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 20),
-          Text('Next Steps', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.deepBlue)),
-          const SizedBox(height: 12),
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            elevation: 2,
-            color: Colors.white,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _stepRow(Icons.search, 'Monitor case status via eCourts portal'),
-                  const SizedBox(height: 12),
-                  _stepRow(Icons.description, 'Prepare documentation per court guidelines'),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 24),
-          Center(
-            child: OutlinedButton.icon(
-              onPressed: _resetForm,
-              icon: const Icon(Icons.refresh),
-              label: const Text('New Analysis'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.deepBlue,
-                side: const BorderSide(color: AppColors.deepBlue),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── REUSABLE WIDGETS ──
-  Widget _buildDropdown({required String label, required String hint, required List<String> items, required String? value, required Function(String?) onChanged}) {
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 10),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      elevation: 3,
-      color: Colors.white,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.deepBlue)),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: value,
-              hint: Text(hint, style: GoogleFonts.poppins(color: Colors.grey[600])),
-              items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-              onChanged: onChanged,
-              decoration: const InputDecoration(border: InputBorder.none, isDense: true),
-              icon: const Icon(Icons.arrow_drop_down, color: AppColors.deepBlue),
-            ),
-          ],
         ),
-      ),
-    );
-  }
 
-  Widget _summaryRow({required IconData icon, required String label, required dynamic value, Color? color, bool badge = false}) {
-    String displayValue = _safeString(value);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 20, color: color ?? AppColors.deepBlue),
-          const SizedBox(width: 12),
-          Expanded(flex: 2, child: Text(label, style: GoogleFonts.poppins(fontSize: 14, color: Colors.black.withOpacity(0.7)), softWrap: true)),
-          const SizedBox(width: 8),
-          Expanded(
-            flex: 3,
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: badge
-                  ? Container(
-                      constraints: const BoxConstraints(maxWidth: 120),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(color: (color ?? Colors.orange).withOpacity(0.2), borderRadius: BorderRadius.circular(20)),
-                      child: Text(displayValue, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: color ?? Colors.orange), textAlign: TextAlign.center, overflow: TextOverflow.ellipsis, maxLines: 1),
-                    )
-                  : Text(displayValue, style: GoogleFonts.poppins(fontSize: 14, color: Colors.black87), textAlign: TextAlign.end, overflow: TextOverflow.ellipsis, maxLines: 2),
-            ),
+        // MAIN CONTENT
+        SliverToBoxAdapter(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 20),
+              _sectionTitle('Citizen Enquiries'),
+              _buildCitizenCarousel(),
+
+              const SizedBox(height: 30),
+              _sectionTitle('Quick Tools'),
+              _buildToolsGrid(),
+
+              const SizedBox(height: 30),
+              _sectionTitle('JusticeGraph Hub'),
+              _buildGraphLabSection(),
+
+              const SizedBox(height: 100),
+            ],
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _metricCard({required IconData icon, required Color color, required String title, required dynamic value}) {
-    String displayValue = _safeString(value);
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      elevation: 2,
-      color: Colors.white,
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: color, size: 26),
-            const SizedBox(height: 6),
-            Text(title, style: GoogleFonts.poppins(fontSize: 11, color: Colors.black54), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
-            const SizedBox(height: 4),
-            Text(displayValue, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
-          ],
         ),
-      ),
-    );
-  }
-
-  Widget _stepRow(IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(icon, color: AppColors.deepBlue, size: 20),
-        const SizedBox(width: 12),
-        Expanded(child: Text(text, style: GoogleFonts.poppins(fontSize: 14, color: Colors.black87))),
       ],
     );
   }
 
-  Widget _buildFeatureTile(String title, IconData icon, Color color, VoidCallback onTap) {
+  Widget _sectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      child: Text(
+        title,
+        style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+      ),
+    );
+  }
+
+  Widget _buildCitizenCarousel() {
+    return SizedBox(
+      height: 160,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        itemCount: _citizenCases.length,
+        itemBuilder: (ctx, i) {
+          final c = _citizenCases[i];
+          return Container(
+            width: 260,
+            margin: const EdgeInsets.only(right: 16, bottom: 10, top: 4),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4))],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                      child: const Icon(Icons.person_search, color: Colors.blue, size: 18),
+                    ),
+                    const Spacer(),
+                    Text('New Inquiry', style: GoogleFonts.outfit(fontSize: 11, color: Colors.grey[400])),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(c['title']!, style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16)),
+                Text(c['category']!, style: GoogleFonts.outfit(fontSize: 13, color: Colors.grey[600])),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildToolsGrid() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        children: [
+          Expanded(
+            child: _modernToolTile(
+              'Summarizer',
+              'Extract details',
+              Icons.summarize_rounded,
+              const Color(0xFFF59E0B),
+              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DocumentSummarizerScreen())),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: _modernToolTile(
+              'Precedents',
+              'Court cases',
+              Icons.gavel_rounded,
+              const Color(0xFF8B5CF6),
+              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrecedentFinderScreen())),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _modernToolTile(String title, String sub, IconData icon, Color color, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.3)),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 6))],
         ),
         child: Column(
           children: [
-            Icon(icon, color: color, size: 32),
-            const SizedBox(height: 8),
-            Text(title, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: color), textAlign: TextAlign.center),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
+              child: Icon(icon, color: color, size: 28),
+            ),
+            const SizedBox(height: 12),
+            Text(title, style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 15)),
+            Text(sub, style: GoogleFonts.outfit(fontSize: 12, color: Colors.grey[500])),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildGraphLabSection() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 15, offset: const Offset(0, 8))],
+        ),
+        child: Column(
+          children: [
+            _buildModernLabTile(
+              'Backlog Risk Predictor',
+              'Scientific speed analysis',
+              Icons.speed,
+              Colors.indigo,
+              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BacklogRiskScreen())),
+            ),
+            _buildModernLabTile(
+              'Duration Estimator',
+              'Likely closure timeline',
+              Icons.timer_outlined,
+              Colors.blue,
+              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CaseDurationScreen())),
+            ),
+            _buildModernLabTile(
+              'District Investigation',
+              'Regional performance',
+              Icons.map_outlined,
+              Colors.teal,
+              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DistrictInvestigationScreen())),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModernLabTile(String title, String sub, IconData icon, Color color, VoidCallback onTap) {
+    return ListTile(
+      onTap: onTap,
+      leading: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+        child: Icon(icon, color: color, size: 22),
+      ),
+      title: Text(title, style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14)),
+      subtitle: Text(sub, style: GoogleFonts.outfit(fontSize: 12, color: Colors.grey[500])),
+      trailing: const Icon(Icons.chevron_right, size: 20),
     );
   }
 }

@@ -239,12 +239,12 @@ class _LawyerProfileScreenState extends State<LawyerProfileScreen> {
                             horizontal: 24, vertical: 16),
                         decoration: BoxDecoration(
                           color: _isSaving
-                              ? AppColors.deepBlue.withOpacity(0.6)
+                              ? AppColors.deepBlue.withValues(alpha: 0.6)
                               : AppColors.deepBlue,
                           borderRadius: BorderRadius.circular(25),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
+                              color: Colors.black.withValues(alpha: 0.1),
                               blurRadius: 6,
                               offset: const Offset(0, 2),
                             ),
@@ -284,32 +284,32 @@ class _LawyerProfileScreenState extends State<LawyerProfileScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: GestureDetector(
-                      onTap: () => LogoutService.logout(context),
+                      onTap: () => _showLogoutDialog(context),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 24, vertical: 16),
                         decoration: BoxDecoration(
-                          color: Colors.transparent,
+                          color: Colors.white,
                           border: Border.all(color: Colors.redAccent, width: 1.5),
                           borderRadius: BorderRadius.circular(25),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
+                              color: Colors.black.withValues(alpha: 0.05),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
                             ),
                           ],
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.logout, color: Colors.redAccent),
-                            const SizedBox(width: 8),
+                            const Icon(Icons.logout_rounded, color: Colors.redAccent),
+                            const SizedBox(width: 10),
                             Text(
-                              'Logout',
+                              'Logout from Account',
                               style: GoogleFonts.poppins(
                                 color: Colors.redAccent,
-                                fontWeight: FontWeight.w500,
+                                fontWeight: FontWeight.w600,
                                 fontSize: 15,
                               ),
                             ),
@@ -318,12 +318,41 @@ class _LawyerProfileScreenState extends State<LawyerProfileScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 40),
                 ],
               ),
             );
           },
         ),
+      ),
+    );
+  }
+
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Logout', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+        content: Text('Are you sure you want to logout? You will need to sign in again to access your dashboard.',
+            style: GoogleFonts.poppins()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              LogoutService.logout(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text('Logout', style: GoogleFonts.poppins(color: Colors.white)),
+          ),
+        ],
       ),
     );
   }

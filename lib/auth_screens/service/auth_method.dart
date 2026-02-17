@@ -1,81 +1,55 @@
-  import 'package:cloud_firestore/cloud_firestore.dart';
-  import 'package:firebase_auth/firebase_auth.dart';
-  import 'package:google_sign_in/google_sign_in.dart';
-  // Google Sign-In Service Class
-  class GoogleSignInService {
-    static final FirebaseAuth _auth = FirebaseAuth.instance;
-    static final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
-    static bool isInitialize = false;
-    static Future<void> initSignIn() async {
-      if (!isInitialize) {
-        await _googleSignIn.initialize(
-          serverClientId:
-              '508715541851-cqudtfo48475bn1t01k9t68vlib2nr2k.apps.googleusercontent.com',
-        );
-      }
-      isInitialize = true;
-    }
-    // Sign in with Google
-    static Future<UserCredential?> signInWithGoogle({String? role}) async {
-      try {
-        initSignIn();
-        final GoogleSignInAccount googleUser = await _googleSignIn.authenticate();
-        final idToken = googleUser.authentication.idToken;
-        final authorizationClient = googleUser.authorizationClient;
-        GoogleSignInClientAuthorization? authorization = await authorizationClient
-            .authorizationForScopes(['email', 'profile']);
-        final accessToken = authorization?.accessToken;
-        if (accessToken == null) {
-          final authorization2 = await authorizationClient.authorizationForScopes(
-            ['email', 'profile'],
-          );
-          if (authorization2?.accessToken == null) {
-            throw FirebaseAuthException(code: "error", message: "error");
-          }
-          authorization = authorization2;
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter/foundation.dart';
+
+class GoogleSignInService {
+  static final FirebaseAuth _auth = FirebaseAuth.instance;
+  static final GoogleSignIn _googleSignIn = GoogleSignIn();
+
+  static Future<UserCredential?> signInWithGoogle({String? role}) async {
+    try {
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) return null;
+
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final AuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final UserCredential userCredential = await _auth.signInWithCredential(credential);
+      final User? user = userCredential.user;
+
+      if (user != null) {
+        try {
+          // Attempt to save user data, but don't fail the whole sign-in if Firestore isn't ready
+          await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+            'uid': user.uid,
+            'name': user.displayName ?? '',
+            'email': user.email ?? '',
+            'photoURL': user.photoURL ?? '',
+            'provider': 'google',
+            'role': role,
+            'lastLogin': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+        } catch (firestoreError) {
+          debugPrint('Firestore Profile Sync Error: $firestoreError');
+          debugPrint('Tip: Ensure Cloud Firestore API is enabled in Firebase Console for project nyaymarg.');
         }
-        final credential = GoogleAuthProvider.credential(
-          accessToken: accessToken,
-          idToken: idToken,
-        );
-        final UserCredential userCredential = await FirebaseAuth.instance
-            .signInWithCredential(credential);
-        final User? user = userCredential.user;
-        if (user != null) {
-          final userDoc = FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid);
-          final docSnapshot = await userDoc.get();
-          if (!docSnapshot.exists) {
-            await userDoc.set({
-              'uid': user.uid,
-              'name': user.displayName ?? '',
-              'email': user.email ?? '',
-              'photoURL': user.photoURL ?? '',
-              'provider': 'google',
-              'role': role,
-              'createdAt': FieldValue.serverTimestamp(),
-            });
-          }
-        }
-        return userCredential;
-      } catch (e) {
-        print('Error: $e');
-        rethrow;
       }
-    }
-    // Sign out
-    static Future<void> signOut() async {
-      try {
-        await _googleSignIn.signOut();
-        await _auth.signOut();
-      } catch (e) {
-        print('Error signing out: $e');
-        throw e;
-      }
-    }
-    // Get current user
-    static User? getCurrentUser() {
-      return _auth.currentUser;
+      return userCredential;
+    } on FirebaseAuthException catch (e) {
+      debugPrint('Firebase Auth Error: ${e.code} - ${e.message}');
+      return null;
+    } catch (e) {
+      debugPrint('Google Sign-In General Error: $e');
+      return null;
     }
   }
+
+  static Future<void> signOut() async {
+    await _googleSignIn.signOut();
+    await _auth.signOut();
+  }
+}

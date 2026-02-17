@@ -173,7 +173,7 @@ class _KnowYourRightsHubState extends State<KnowYourRightsHub> {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.15),
+              color: Colors.black.withValues(alpha: 0.15),
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),
@@ -188,7 +188,7 @@ class _KnowYourRightsHubState extends State<KnowYourRightsHub> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: isDark ? Colors.white.withOpacity(0.2) : Colors.white.withOpacity(0.5),
+                  color: isDark ? Colors.white.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.5),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -239,7 +239,7 @@ class _KnowYourRightsHubState extends State<KnowYourRightsHub> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: isDark ? Colors.white.withOpacity(0.1) : Colors.white.withOpacity(0.4),
+                    color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.4),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(

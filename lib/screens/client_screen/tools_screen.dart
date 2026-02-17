@@ -1,7 +1,5 @@
 // lib/screens/client_screen/tools_screen.dart
-import 'dart:io';
 import 'dart:typed_data';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
@@ -115,10 +113,10 @@ class ToolsScreen extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.primaryBlue.withOpacity(0.25), width: 1.5),
+          border: Border.all(color: AppColors.primaryBlue.withValues(alpha: 0.25), width: 1.5),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
+              color: Colors.grey.withValues(alpha: 0.1),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -131,7 +129,7 @@ class ToolsScreen extends StatelessWidget {
             Container(
               padding: EdgeInsets.all(isSmall ? 12 : 16),
               decoration: BoxDecoration(
-                color: AppColors.primaryBlue.withOpacity(0.12),
+                color: AppColors.primaryBlue.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -176,7 +174,7 @@ class ToolsScreen extends StatelessWidget {
 /// =========================================================
 Widget buildIcon(bool isSmall, IconData icon) => Container(
       padding: EdgeInsets.all(isSmall ? 20 : 24),
-      decoration: BoxDecoration(color: AppColors.primaryBlue.withOpacity(0.1), shape: BoxShape.circle),
+      decoration: BoxDecoration(color: AppColors.primaryBlue.withValues(alpha: 0.1), shape: BoxShape.circle),
       child: Icon(icon, color: AppColors.primaryBlue, size: isSmall ? 48 : 56),
     );
 

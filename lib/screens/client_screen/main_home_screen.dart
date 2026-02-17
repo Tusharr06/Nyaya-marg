@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:nyaya_marg/screens/client_screen/know_your_rights_hub.dart';
 import 'package:nyaya_marg/theme/colors.dart';
 
 // Import all screen files (we'll create them below)
 import 'home_screen.dart';
 import 'chat_screen.dart';
-import 'rights_screen.dart';
 import 'tools_screen.dart';
 import 'profile_screen.dart';
 
