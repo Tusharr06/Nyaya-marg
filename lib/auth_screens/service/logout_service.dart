@@ -10,7 +10,7 @@ class LogoutService {
       await FirebaseAuth.instance.signOut();
       
       // Sign out from Google if signed in with Google
-      final googleSignIn = GoogleSignIn.instance;
+      final googleSignIn = GoogleSignIn();
       await googleSignIn.signOut();
       
       // Navigate to role selection screen

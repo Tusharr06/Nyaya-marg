@@ -3,7 +3,6 @@ import 'package:flutter_markdown/flutter_markdown.dart'; // FIXED: Official pack
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:nyaya_marg/auth_screens/service/gemini_service.dart';
-import 'package:nyaya_marg/screens/client_screen/home_screen.dart';
 import 'package:nyaya_marg/theme/colors.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -95,7 +94,7 @@ User query: "$text"
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 2,
-        shadowColor: AppColors.shadowGrey.withOpacity(0.15),
+        shadowColor: AppColors.shadowGrey.withValues(alpha: 0.15),
         title: Row(
           children: [
             CircleAvatar(
@@ -151,7 +150,7 @@ User query: "$text"
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.shadowGrey.withOpacity(0.2),
+                  color: AppColors.shadowGrey.withValues(alpha: 0.2),
                   blurRadius: 10,
                   offset: const Offset(0, -2),
                 ),
@@ -171,7 +170,7 @@ User query: "$text"
                         fontSize: 14,
                       ),
                       filled: true,
-                      fillColor: AppColors.backgroundColor.withOpacity(0.5),
+                      fillColor: AppColors.backgroundColor.withValues(alpha: 0.5),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(25),
                         borderSide: BorderSide.none,
@@ -205,7 +204,7 @@ User query: "$text"
     final bool isUser = msg.isUser;
     final Color bubble = isUser
         ? AppColors.deepBlue
-        : AppColors.lightBlue.withOpacity(0.9);
+        : AppColors.lightBlue.withValues(alpha: 0.9);
     final CrossAxisAlignment align =
         isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start;
 
@@ -230,7 +229,7 @@ User query: "$text"
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withValues(alpha: 0.1),
                   blurRadius: 6,
                   offset: const Offset(0, 2),
                 ),
@@ -289,7 +288,7 @@ User query: "$text"
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-              color: AppColors.lightBlue.withOpacity(0.7),
+              color: AppColors.lightBlue.withValues(alpha: 0.7),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Row(

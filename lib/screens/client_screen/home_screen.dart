@@ -271,10 +271,10 @@ Be concise, realistic, and base numbers on typical Indian court data.
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
+                  color: Colors.red.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                   border:
-                      Border.all(color: Colors.red.withOpacity(0.3))),
+                      Border.all(color: Colors.red.withValues(alpha: 0.3))),
               child: Row(
                 children: [
                   const Icon(Icons.error_outline,
@@ -338,7 +338,7 @@ Be concise, realistic, and base numbers on typical Indian court data.
             const Spacer(),
             CircleAvatar(
                 radius: 24,
-                backgroundColor: AppColors.deepBlue.withOpacity(0.2),
+                backgroundColor: AppColors.deepBlue.withValues(alpha: 0.2),
                 child: const Icon(Icons.balance,
                     color: AppColors.deepBlue)),
           ],
@@ -525,7 +525,7 @@ Be concise, realistic, and base numbers on typical Indian court data.
                     color: AppColors.deepBlue)),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              value: value,
+              initialValue: value,
               hint: Text(hint,
                   style: GoogleFonts.poppins(color: Colors.grey[600])),
               items: items
@@ -600,7 +600,7 @@ Be concise, realistic, and base numbers on typical Indian court data.
               flex: 2,
               child: Text(label,
                   style: GoogleFonts.poppins(
-                      fontSize: 14, color: Colors.black.withOpacity(0.7)),
+                      fontSize: 14, color: Colors.black.withValues(alpha: 0.7)),
                   softWrap: true)),
           const SizedBox(width: 8),
           Expanded(
@@ -613,7 +613,7 @@ Be concise, realistic, and base numbers on typical Indian court data.
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                          color: (color ?? Colors.orange).withOpacity(0.2),
+                          color: (color ?? Colors.orange).withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(20)),
                       child: Text(display,
                           style: GoogleFonts.poppins(

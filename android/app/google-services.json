@@ -1,26 +1,44 @@
 {
   "project_info": {
-    "project_number": "62948481801",
-    "project_id": "nyayamarg",
-    "storage_bucket": "nyayamarg.firebasestorage.app"
+    "project_number": "753801306682",
+    "project_id": "nyaymarg",
+    "storage_bucket": "nyaymarg.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:62948481801:android:135e3dd41207b7799991d8",
+        "mobilesdk_app_id": "1:753801306682:android:a2a7c487fd9676dc67cb03",
         "android_client_info": {
           "package_name": "com.example.nyaya_marg"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "753801306682-q2c42v9occn93sa6ddthgh59hnsdulfe.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.nyaya_marg",
+            "certificate_hash": "5781f6b35cd2f3197f3b3f9989d3ddb5068ce930"
+          }
+        },
+        {
+          "client_id": "753801306682-ugsn7cpp90jaagfetb6ngv34ecer4udl.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyB6FFuVTREcTrogrKIVh1ZBR1zkFMr53WA"
+          "current_key": "AIzaSyA2CI8uy0YW4BPxc2RQzvKXxfPn6ab4a4Y"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "753801306682-ugsn7cpp90jaagfetb6ngv34ecer4udl.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
