@@ -12,7 +12,7 @@ class MainHomeScreen extends StatefulWidget {
   const MainHomeScreen({super.key});
 
   @override
-  _MainHomeScreenState createState() => _MainHomeScreenState();
+  State<MainHomeScreen> createState() => _MainHomeScreenState();
 }
 
 class _MainHomeScreenState extends State<MainHomeScreen> {
