@@ -1,299 +1,180 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown/flutter_markdown.dart'; // FIXED: Official package
-import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
-import 'package:nyaya_marg/auth_screens/service/gemini_service.dart';
-import 'package:nyaya_marg/theme/colors.dart';
+import '../../theme/premium_theme.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
+
   @override
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
-  final ScrollController _scrollController = ScrollController();
-
-  final List<ChatMessage> _messages = [
-    ChatMessage(
-      text: "Hello! I'm your AI Legal Assistant. How can I help you today?",
-      isUser: false,
-      timestamp: DateTime.now().subtract(const Duration(minutes: 2)),
-    ),
+  final List<Map<String, dynamic>> _messages = [
+    {"text": "Hello! I am your NyayMarg legal assistant. How can I help you today?", "isBot": true},
   ];
-
   bool _isTyping = false;
 
-  Future<void> _sendMessage() async {
-    final text = _controller.text.trim();
-    if (text.isEmpty) return;
-
-    final userMsg = ChatMessage(
-      text: text,
-      isUser: true,
-      timestamp: DateTime.now(),
-    );
-
+  void _sendMessage(String text) {
+    if (text.trim().isEmpty) return;
+    
     setState(() {
-      _messages.add(userMsg);
+      _messages.add({"text": text, "isBot": false});
       _isTyping = true;
     });
-
     _controller.clear();
-    _scrollToBottom();
 
-    final prompt = """
-You are Nyaya Marg AI, a professional legal assistant for Indian law.
-Answer **in English only**, keep it concise (3-5 sentences), cite sections.
-Use **markdown** for bold: **Section 138**.
-User query: "$text"
-""";
-
-    try {
-      final aiReply = await GeminiService.generate(prompt);
-      if (!mounted) return;
-
-      setState(() {
-        _messages.add(ChatMessage(
-          text: aiReply,
-          isUser: false,
-          timestamp: DateTime.now(),
-        ));
-        _isTyping = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _messages.add(ChatMessage(
-          text: "Sorry, the AI is having trouble. Try again!",
-          isUser: false,
-          timestamp: DateTime.now(),
-        ));
-        _isTyping = false;
-      });
-    }
-    _scrollToBottom();
+    // Simulate AI response streaming
+    _simulateResponse("I've analyzed your query about property disputes. I found 3 similar cases in the Bengaluru District Court with a 65% success rate for similar claims. Would you like to view the precedents or predict the case outcome?");
   }
 
-  void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
+  void _simulateResponse(String fullResponse) async {
+    await Future.delayed(const Duration(milliseconds: 1000));
+    
+    final id = _messages.length;
+    setState(() {
+      _messages.add({"text": "", "isBot": true, "id": id});
+      _isTyping = false;
     });
+
+    String currentText = "";
+    final words = fullResponse.split(" ");
+    
+    for (var word in words) {
+      await Future.delayed(const Duration(milliseconds: 50));
+      currentText += "$word ";
+      if (mounted) {
+        setState(() {
+          _messages[id] = {"text": currentText.trim(), "isBot": true};
+        });
+      }
+    }
+
+    // Add Action Cards after response
+    if (mounted) {
+      setState(() {
+        _messages.add({
+          "isBot": true,
+          "isCard": true,
+          "actions": [
+            {"label": "View Precedents", "icon": Icons.library_books},
+            {"label": "Predict Case", "icon": Icons.analytics_outlined},
+          ]
+        });
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 2,
-        shadowColor: AppColors.shadowGrey.withValues(alpha: 0.15),
-        title: Row(
-          children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: AppColors.deepBlue,
-              child: const Icon(Icons.smart_toy, color: Colors.white, size: 20),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'AI Legal Assistant',
-                  style: GoogleFonts.poppins(
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black,
-                    fontSize: 16,
-                  ),
-                ),
-                Text(
-                  'Online',
-                  style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    color: Colors.black54,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-        centerTitle: false, // LEFT ALIGNED
+        title: const Text("Legal Assistant"),
+        actions: [
+          IconButton(icon: const Icon(Icons.history, color: Colors.white54), onPressed: () {}),
+        ],
       ),
-      backgroundColor: AppColors.backgroundColor,
       body: Column(
         children: [
+          _buildDisclaimer(),
           Expanded(
             child: ListView.builder(
-              controller: _scrollController,
               padding: const EdgeInsets.all(16),
-              itemCount: _messages.length + (_isTyping ? 1 : 0),
-              itemBuilder: (ctx, i) {
-                if (i == _messages.length && _isTyping) {
-                  return _typingIndicator();
+              itemCount: _messages.length,
+              itemBuilder: (context, index) {
+                final msg = _messages[index];
+                if (msg['isCard'] == true) {
+                  return _buildActionCard(msg['actions']);
                 }
-                return _messageBubble(_messages[i]);
+                return _buildChatBubble(msg['text'], msg['isBot']);
               },
             ),
           ),
-          // INPUT BAR
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.shadowGrey.withValues(alpha: 0.2),
-                  blurRadius: 10,
-                  offset: const Offset(0, -2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    textInputAction: TextInputAction.send,
-                    onSubmitted: (_) => _sendMessage(),
-                    decoration: InputDecoration(
-                      hintText: 'Ask anything about your legal rights...',
-                      hintStyle: GoogleFonts.poppins(
-                        color: AppColors.greyColor,
-                        fontSize: 14,
-                      ),
-                      filled: true,
-                      fillColor: AppColors.backgroundColor.withValues(alpha: 0.5),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(25),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: _sendMessage,
-                  child: CircleAvatar(
-                    radius: 24,
-                    backgroundColor: AppColors.deepBlue,
-                    child: const Icon(Icons.send, color: Colors.white, size: 20),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          if (_isTyping) _buildTypingIndicator(),
+          _buildInputArea(),
         ],
       ),
     );
   }
 
-  // MESSAGE BUBBLE
-  Widget _messageBubble(ChatMessage msg) {
-    final bool isUser = msg.isUser;
-    final Color bubble = isUser
-        ? AppColors.deepBlue
-        : AppColors.lightBlue.withValues(alpha: 0.9);
-    final CrossAxisAlignment align =
-        isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Column(
-        crossAxisAlignment: align,
-        children: [
-          Container(
-            constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.75),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: bubble,
-              borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(16),
-                topRight: const Radius.circular(16),
-                bottomLeft:
-                    isUser ? const Radius.circular(16) : const Radius.circular(4),
-                bottomRight:
-                    isUser ? const Radius.circular(4) : const Radius.circular(16),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: isUser
-                ? Text(
-                    msg.text,
-                    style: GoogleFonts.poppins(
-                      color: Colors.white,
-                      fontSize: 15,
-                      height: 1.4,
-                    ),
-                  )
-                : MarkdownBody(
-                    data: msg.text,
-                    selectable: true,
-                    styleSheet: MarkdownStyleSheet(
-                      p: GoogleFonts.poppins(
-                        color: Colors.black87,
-                        fontSize: 15,
-                        height: 1.4,
-                      ),
-                      strong: GoogleFonts.poppins(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
-                    ),
-                  ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            DateFormat('h:mm a').format(msg.timestamp),
-            style: GoogleFonts.poppins(
-              fontSize: 11,
-              color: AppColors.greyColor,
-            ),
-          ),
-        ],
+  Widget _buildDisclaimer() {
+    return Container(
+      width: double.infinity,
+      color: PremiumTheme.primaryGold.withValues(alpha: 0.05),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      child: const Text(
+        "⚠️ AI-generated responses are for guidance only.",
+        style: TextStyle(color: Colors.white38, fontSize: 10),
+        textAlign: TextAlign.center,
       ),
     );
   }
 
-  // TYPING INDICATOR
-  Widget _typingIndicator() {
+  Widget _buildChatBubble(String text, bool isBot) {
+    return Align(
+      alignment: isBot ? Alignment.centerLeft : Alignment.centerRight,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+        decoration: BoxDecoration(
+          color: isBot ? PremiumTheme.surfaceDark : PremiumTheme.primaryGold,
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(16),
+            topRight: const Radius.circular(16),
+            bottomLeft: Radius.circular(isBot ? 0 : 16),
+            bottomRight: Radius.circular(isBot ? 16 : 0),
+          ),
+          border: isBot ? Border.all(color: Colors.white10) : null,
+        ),
+        child: Text(
+          text,
+          style: TextStyle(
+            color: isBot ? Colors.white.withValues(alpha: 0.9) : Colors.black,
+            fontSize: 14,
+            height: 1.4,
+          ),
+        ),
+      ),
+    ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1);
+  }
+
+  Widget _buildActionCard(List actions) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12, left: 0),
+      child: Row(
+        children: actions.map<Widget>((action) => Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: ActionChip(
+            backgroundColor: PremiumTheme.deepBlue,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: PremiumTheme.primaryGold, width: 0.5),
+            ),
+            avatar: Icon(action['icon'], size: 16, color: PremiumTheme.primaryGold),
+            label: Text(action['label'], style: const TextStyle(color: PremiumTheme.primaryGold, fontSize: 12, fontWeight: FontWeight.bold)),
+            onPressed: () {},
+          ),
+        )).toList(),
+      ),
+    ).animate().fadeIn().slideX();
+  }
+
+  Widget _buildTypingIndicator() {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.only(left: 16, bottom: 16),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 16,
-            backgroundColor: AppColors.goldenAccent,
-            child: const Icon(Icons.smart_toy, color: Colors.white, size: 16),
-          ),
-          const SizedBox(width: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: AppColors.lightBlue.withValues(alpha: 0.7),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: List.generate(3, (i) => _dot(i)),
+          const Text("NyayMarg is thinking", style: TextStyle(color: Colors.white38, fontSize: 12)),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 20,
+            child: const LinearProgressIndicator(
+              backgroundColor: Colors.transparent,
+              color: PremiumTheme.primaryGold,
+              minHeight: 2,
             ),
           ),
         ],
@@ -301,30 +182,47 @@ User query: "$text"
     );
   }
 
-  Widget _dot(int index) {
-    return AnimatedContainer(
-      duration: Duration(milliseconds: 300 + (index * 100)),
-      curve: Curves.easeInOut,
-      margin: const EdgeInsets.symmetric(horizontal: 3),
-      width: 8,
-      height: 8,
-      decoration: const BoxDecoration(
-        color: AppColors.deepBlue,
-        shape: BoxShape.circle,
+  Widget _buildInputArea() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: PremiumTheme.deepBlue,
+        border: Border(top: BorderSide(color: Colors.white10)),
+      ),
+      child: SafeArea(
+        child: Row(
+          children: [
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: PremiumTheme.surfaceDark,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: Colors.white10),
+                ),
+                child: TextField(
+                  controller: _controller,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    hintText: "Type your legal query...",
+                    hintStyle: TextStyle(color: Colors.white24, fontSize: 14),
+                    border: InputBorder.none,
+                  ),
+                  onSubmitted: _sendMessage,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            CircleAvatar(
+              backgroundColor: PremiumTheme.primaryGold,
+              child: IconButton(
+                icon: const Icon(Icons.send, color: Colors.black, size: 20),
+                onPressed: () => _sendMessage(_controller.text),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
-}
-
-// MODEL
-class ChatMessage {
-  final String text;
-  final bool isUser;
-  final DateTime timestamp;
-
-  ChatMessage({
-    required this.text,
-    required this.isUser,
-    required this.timestamp,
-  });
 }

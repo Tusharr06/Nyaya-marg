@@ -234,7 +234,7 @@ class _BacklogRiskScreenState extends State<BacklogRiskScreen> {
         const SizedBox(height: 24),
         Text('Factor Insights', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600)),
         const SizedBox(height: 12),
-        ...explanation.entries.map((e) => _buildExplanationTile(e.key, e.value.toString())).toList(),
+        ...explanation.entries.map((e) => _buildExplanationTile(e.key, e.value.toString())),
       ],
     );
   }

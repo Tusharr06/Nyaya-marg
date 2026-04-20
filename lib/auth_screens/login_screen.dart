@@ -15,7 +15,7 @@ class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, this.selectedRole});
 
   @override
-  _LoginScreenState createState() => _LoginScreenState();
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
@@ -46,8 +46,9 @@ class _LoginScreenState extends State<LoginScreen> {
         if (mounted) {
           // Validate role after successful authentication
           final isValidRole = await _validateUserRole();
-          if (isValidRole) {
+          if (isValidRole && mounted) {
             final home = await getHomeAfterAuth();
+            if (!mounted) return;
             Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => home));
           } else {
             // Check if user exists but doesn't have a role yet
@@ -73,6 +74,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 
                 // Now proceed to home screen
                 final home = await getHomeAfterAuth();
+                if (!mounted) return;
                 Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => home));
                 return;
               }
@@ -121,8 +123,9 @@ class _LoginScreenState extends State<LoginScreen> {
       if (userCredential != null && mounted) {
         // Validate role after successful authentication
         final isValidRole = await _validateUserRole();
-        if (isValidRole) {
+        if (isValidRole && mounted) {
           final home = await getHomeAfterAuth();
+          if (!mounted) return;
           Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => home));
         } else {
           // Check if user exists but doesn't have a role yet
@@ -148,6 +151,7 @@ class _LoginScreenState extends State<LoginScreen> {
               
               // Now proceed to home screen
               final home = await getHomeAfterAuth();
+              if (!mounted) return;
               Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => home));
               return;
             }

@@ -210,7 +210,7 @@ class _CaseDurationScreenState extends State<CaseDurationScreen> {
       child: Column(
         children: [
           CircularProgressIndicator(color: AppColors.primaryBlue),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           Text('Processing Regressor...', style: TextStyle(color: Colors.grey)),
         ],
       ),

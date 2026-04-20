@@ -11,7 +11,7 @@ class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key, this.selectedRole});
 
   @override
-  _SignupScreenState createState() => _SignupScreenState();
+  State<SignupScreen> createState() => _SignupScreenState();
 }
 
 class _SignupScreenState extends State<SignupScreen> {
@@ -61,6 +61,7 @@ void initState() {
 
         if (mounted) {
           final home = await getHomeAfterAuth();
+          if (!mounted) return;
           Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => home));
         }
       } on FirebaseAuthException catch (e) {
@@ -318,7 +319,7 @@ void initState() {
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
-            // color: AppColors.greyColor.withOpacity(0.2),
+            // color: AppColors.greyColor.withValues(alpha: 0.2),
             color: Colors.grey.withValues(alpha: 0.2),
             spreadRadius: 2,
             blurRadius: 5,
